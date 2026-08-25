@@ -8,10 +8,11 @@ globalThis.__nroraAuthPool = pool;
 const SECRET = process.env.SESSION_SECRET || "change-this-session-secret-in-vercel";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "NRORA@123";
+const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 
 const json = (res, status, body) => res.status(status).json(body);
 const hash = p => crypto.createHash("sha256").update(`${SECRET}:${p}`).digest("hex");
-const makeToken = u => Buffer.from(JSON.stringify({ id:u.id, username:u.username, role:u.role, exp:Date.now()+43200000 })).toString("base64url") + "." + crypto.createHmac("sha256", SECRET).update(`${u.id}:${u.username}:${u.role}`).digest("hex");
+const makeToken = u => Buffer.from(JSON.stringify({ id:u.id, username:u.username, role:u.role, exp:Date.now()+SESSION_MS })).toString("base64url") + "." + crypto.createHmac("sha256", SECRET).update(`${u.id}:${u.username}:${u.role}`).digest("hex");
 
 async function schema(){
   await pool.query(`create table if not exists users(

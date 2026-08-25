@@ -26,9 +26,7 @@ app.post("/api/payments/webhook", express.raw({type:"application/json"}), async 
     if(!signature || !crypto.timingSafeEqual(Buffer.from(signature),Buffer.from(expected))) return res.status(400).json({error:"Invalid webhook signature"});
     const event=JSON.parse(req.body.toString("utf8"));
     const p=event.payload?.payment?.entity;
-    if(event.event==="payment.captured" && p?.id){
-      await finalizeCapturedPayment({orderId:p.order_id,paymentId:p.id,amount:Number(p.amount||0)/100,method:(p.method||"UPI").toUpperCase(),transactionRef:p.id});
-    }
+    if(event.event==="payment.captured" && p?.id) await finalizeCapturedPayment({orderId:p.order_id,paymentId:p.id,amount:Number(p.amount||0)/100,method:(p.method||"UPI").toUpperCase(),transactionRef:p.id});
     if(event.event==="payment.failed" && p?.order_id) await pool.query("update payments set status='failed' where gateway_order_id=$1",[p.order_id]);
     res.status(200).json({ok:true});
   } catch(err){ console.error("Razorpay webhook error",err); res.status(500).json({error:"Webhook processing failed"}); }
@@ -55,7 +53,7 @@ async function ensureAdmin(){
 async function razorpayRequest(path,method="GET",body){
   if(!RAZORPAY_KEY_ID||!RAZORPAY_KEY_SECRET) throw Object.assign(new Error("Razorpay is not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in Vercel."),{statusCode:503});
   const authHeader=Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString("base64");
-  const r=await fetch(`https://api.razorpay.com/v1${path}`,{method,headers:{Authorization:`Basic ${authHeader},Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
+  const r=await fetch(`https://api.razorpay.com/v1${path}`,{method,headers:{Authorization:`Basic ${authHeader}`,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
   const data=await r.json(); if(!r.ok) throw Object.assign(new Error(data.error?.description||"Razorpay request failed"),{statusCode:r.status}); return data;
 }
 async function makeReceipt(customerId,paymentId){
@@ -98,7 +96,7 @@ app.post("/api/payments/create-order",auth(["admin","employee"]),asyncRoute(asyn
   const payment=await pool.query("insert into payments(customer_id,amount,method,transaction_ref,status,gateway_order_id) values($1,$2,'UPI','',$3,$4) returning *",[customerId,MEMBERSHIP_AMOUNT,"pending",order.id]);
   let qr=null;
   try { qr=await razorpayRequest("/payments/qr_codes","POST",{type:"upi_qr",name:`NRORA ${c.rows[0].name}`,usage:"single_use",fixed_amount:true,payment_amount:MEMBERSHIP_AMOUNT*100,description:`NRORA yearly membership - ${c.rows[0].vehicle_no}`,close_by:Math.floor(Date.now()/1000)+7200,notes:{payment_id:String(payment.rows[0].id),customer_id:String(customerId)}}); } catch(e){ console.warn("Razorpay QR unavailable:",e.message); }
-  res.status(201).json({orderId:order.id,keyId:RAZORPAY_KEY_ID,amount:MEMBERSHIP_AMOUNT*100,currency:"INR",paymentId:payment.rows[0].id,qr:qr?{id:qr.id,image_url:qr.image_url||qr.image_content,status:qr.status}:null,customer:c.rows[0]});
+  res.status(201).json({orderId:order.id,keyId:RAZORPAY_KEY_ID,amount:MEMBERSHIP_AMOUNT*100,currency:"INR",paymentId:payment.rows[0].id,qr:qr?{id:qr.id,image_url:qr.image_url||"",status:qr.status}:null,customer:c.rows[0]});
 }));
 app.post("/api/payments/verify",auth(["admin","employee"]),asyncRoute(async(req,res)=>{
   const {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body; if(!razorpay_order_id||!razorpay_payment_id||!razorpay_signature) return res.status(400).json({error:"Incomplete payment verification data"});
@@ -108,7 +106,7 @@ app.post("/api/payments/verify",auth(["admin","employee"]),asyncRoute(async(req,
   const done=await finalizeCapturedPayment({orderId:razorpay_order_id,paymentId:razorpay_payment_id,amount:Number(r.amount)/100,method:(r.method||"UPI").toUpperCase(),transactionRef:razorpay_payment_id}); if(!done) return res.status(409).json({error:"Payment could not be confirmed"}); res.json(done);
 }));
 app.get("/api/payments/status",auth(["admin","employee"]),asyncRoute(async(req,res)=>{const orderId=String(req.query.order_id||""); if(!orderId) return res.status(400).json({error:"order_id is required"}); const r=await pool.query("select p.*,c.name customer_name,c.phone,c.vehicle_no,r.receipt_no,r.created_at receipt_created_at from payments p left join customers c on c.id=p.customer_id left join receipts r on r.payment_id=p.id where p.gateway_order_id=$1 limit 1",[orderId]); if(!r.rowCount)return res.status(404).json({error:"Payment not found"}); res.json(r.rows[0]);}));
-app.post("/api/payments",auth(["admin","employee"]),asyncRoute(async(req,res)=>{return res.status(410).json({error:"Manual payment confirmation is disabled. Use the secure payment gateway."});}));
+app.post("/api/payments",auth(["admin","employee"]),asyncRoute(async(req,res)=>res.status(410).json({error:"Manual payment confirmation is disabled. Use the secure payment gateway."})));
 app.post("/api/memberships/renew",auth(["admin","employee"]),asyncRoute(async(req,res)=>{const {customer_id,renewal_date}=req.body;if(!customer_id||!renewal_date)return res.status(400).json({error:"customer_id and renewal_date are required"});const r=await pool.query("insert into memberships(customer_id,amount,renewal_date) values($1,4500,$2) returning *",[customer_id,renewal_date]);res.status(201).json(r.rows[0]);}));
 app.use((err,_req,res,_next)=>{console.error(err);res.status(err.statusCode||500).json({error:err.message||"Internal server error"});});
 ensurePaymentSchema().then(ensureAdmin).then(()=>app.listen(port,()=>console.log(`NRORA API running on ${port}`))).catch(err=>{console.error("Startup failed",err);process.exit(1)});

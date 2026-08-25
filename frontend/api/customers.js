@@ -1,6 +1,10 @@
 import handler from "./[...path].js";
 
 export default async function customersHandler(req, res) {
-  req.query = { ...(req.query || {}), path: ["customers"] };
+  const id = req.query?.id;
+  req.query = {
+    ...(req.query || {}),
+    path: id ? ["customers", String(id)] : ["customers"]
+  };
   return handler(req, res);
 }

@@ -125,4 +125,4 @@ app.use((err,_req,res,_next) => {
   res.status(500).json({error:"Internal server error"});
 });
 
-app.listen(port,()=>console.log(`NR Road Care API running on ${port}`));
+app.listen(port,()=>console.log(`NRORA API running on ${port}`));

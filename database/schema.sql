@@ -25,3 +25,5 @@ create table if not exists receipts(
  payment_id bigint references payments(id) on delete set null,
  receipt_no varchar(50) unique not null, created_at timestamptz default now()
 );
+
+create table if not exists payment_settings(id bigserial primary key,business_name varchar(120) default 'NRORA',bank_name varchar(120) default '',account_holder varchar(120) default '',account_number varchar(60) default '',ifsc varchar(20) default '',branch varchar(120) default '',upi_id varchar(120) default '',qr_image_url text default '',show_bank_details boolean default false,show_upi boolean default true,updated_at timestamptz default now());

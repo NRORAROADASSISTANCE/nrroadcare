@@ -11,7 +11,7 @@ function Layout(){
  return <div className="shell">
   <button className="mobile" onClick={()=>setOpen(!open)}>{open?<X/>:<Menu/>}</button>
   <aside className={open?"side open":"side"}>
-   <div className="brand"><div className="logo">NR</div><div><b>NR Road Care</b><small>Road Assistance</small></div></div>
+   <div className="brand"><div className="logo">NR</div><div><b>NRORA</b><small>Road Assistance</small></div></div>
    <nav>{links.map(([to,I,label])=><NavLink key={to} to={to} end={to==="/"} onClick={()=>setOpen(false)} className={({isActive})=>isActive?"nav active":"nav"}><I size={18}/>{label}</NavLink>)}</nav>
    <div className="footer"><a href={`tel:${phone}`}><Phone size={15}/>{phone}</a><a href={`https://${domain}`} target="_blank" rel="noreferrer"><Globe size={15}/>{domain}</a><span><Map size={15}/>Mugpal Village, Mugpal Mandal,<br/>Nizamabad District, Telangana 503230</span></div>
   </aside>
@@ -22,7 +22,7 @@ function Layout(){
 function Dashboard(){
  const [d,setD]=useState(null);
  useEffect(()=>{fetch(`${API}/dashboard`).then(r=>r.json()).then(setD).catch(()=>{})},[]);
- return <Page title="Dashboard" sub="NR Road Care operations">
+ return <Page title="Dashboard" sub="NRORA operations">
   <div className="stats"><Stat t="Customers" v={d?.customers??"—"}/><Stat t="Active Requests" v={d?.activeRequests??"—"}/><Stat t="Technicians" v={d?.techniciansOnline??"—"}/><Stat t="Revenue" v={d?`₹${d.revenue}`:"—"}/></div>
   <div className="card"><h2>Yearly Membership</h2><p className="muted">₹4,500 per year</p><p className="muted">Payment, receipt and renewal APIs are ready for integration.</p></div>
  </Page>
@@ -41,8 +41,8 @@ function Requests(){return <Page title="Service Requests" sub="Live roadside ass
 function Technicians(){return <Page title="Technicians" sub="Mechanic and field technician management"><div className="card empty"><Users/><h2>Technician API ready</h2><p className="muted">Add technicians through POST /api/technicians.</p></div></Page>}
 function Payments(){return <Page title="Payments & Receipts" sub="Membership payment and instant receipt workflow"><div className="card"><h2>Membership</h2><p className="muted">₹4,500 · UPI / QR supported at API layer.</p><p className="muted">Payment creates a receipt number automatically.</p></div></Page>}
 function Login({title}){const nav=useNavigate();return <Page title={title} sub="Secure authentication will connect to the production auth service."><form className="card form login" onSubmit={e=>{e.preventDefault();nav("/")}}><label>Username<input required/></label><label>Password<input type="password" required/></label><button className="primary">Login</button></form></Page>}
-function SettingsPage(){return <Page title="Settings" sub="System configuration"><div className="card"><h2>NR Road Care</h2><p className="muted">Domain: {domain}</p><p className="muted">Membership: ₹4,500 / year</p><p className="muted">Phone: {phone}</p></div></Page>}
+function SettingsPage(){return <Page title="Settings" sub="System configuration"><div className="card"><h2>NRORA</h2><p className="muted">Domain: {domain}</p><p className="muted">Membership: ₹4,500 / year</p><p className="muted">Phone: {phone}</p></div></Page>}
 function Contact(){return <Page title="Contact Us" sub="Mugpal Village, Mugpal Mandal, Nizamabad District, Telangana 503230"><div className="card"><a className="primary" href={`tel:${phone}`}><Phone/> Call {phone}</a></div></Page>}
-const Page=({title,sub,children})=><section><div className="head"><div><span>NR ROAD CARE</span><h1>{title}</h1><p>{sub}</p></div></div>{children}</section>;
+const Page=({title,sub,children})=><section><div className="head"><div><span>NRORA</span><h1>{title}</h1><p>{sub}</p></div></div>{children}</section>;
 
 export default function App(){return <Layout/>}

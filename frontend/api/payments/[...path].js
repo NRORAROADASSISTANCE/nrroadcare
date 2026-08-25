@@ -3,18 +3,22 @@ import crypto from "crypto";
 const { Pool } = pg;
 const pool = globalThis.__nroraPaymentsPool || new Pool({ connectionString: process.env.DATABASE_URL, max: 5, idleTimeoutMillis: 10000, connectionTimeoutMillis: 10000 });
 globalThis.__nroraPaymentsPool = pool;
-const SECRET = process.env.SESSION_SECRET || "change-this-session-secret-in-vercel";
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || "";
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || "";
+const SECRET = String(process.env.SESSION_SECRET || "change-this-session-secret-in-vercel").trim();
+const RAZORPAY_KEY_ID = String(process.env.RAZORPAY_KEY_ID || "").trim();
+const RAZORPAY_KEY_SECRET = String(process.env.RAZORPAY_KEY_SECRET || "").trim();
 const json=(res,status,body)=>res.status(status).json(body);
 const readToken=t=>{try{const [p,s]=String(t||"").split(".");const u=JSON.parse(Buffer.from(p,"base64url").toString());const e=crypto.createHmac("sha256",SECRET).update(`${u.id}:${u.username}:${u.role}`).digest("hex");if(!s||s.length!==e.length||!crypto.timingSafeEqual(Buffer.from(s),Buffer.from(e))||u.exp<Date.now())return null;return u}catch{return null}};
 const requireAuth=(req,res)=>{const t=(req.headers.authorization||"").replace(/^Bearer\s+/i,"");const u=readToken(t);if(!u||!["admin","division_manager","area_manager","tl","staff"].includes(u.role)){json(res,401,{error:"Unauthorized"});return null}return u};
 async function razor(path,method="GET",body){
-  if(!RAZORPAY_KEY_ID||!RAZORPAY_KEY_SECRET) throw new Error("Razorpay is not configured in Vercel. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.");
+  if(!RAZORPAY_KEY_ID||!RAZORPAY_KEY_SECRET) throw new Error("Razorpay is not configured in Vercel Production.");
   const auth=Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString("base64");
   const r=await fetch(`https://api.razorpay.com/v1${path}`,{method,headers:{Authorization:`Basic ${auth}`,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
-  const data=await r.json();
-  if(!r.ok) throw new Error(data?.error?.description||data?.error?.code||`Razorpay request failed (${r.status})`);
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok){
+    const requestId=r.headers.get("x-razorpay-request-id")||r.headers.get("x-request-id")||"";
+    if(r.status===401) throw new Error(`Razorpay authentication failed (HTTP 401). Production key prefix ${RAZORPAY_KEY_ID.slice(0,18)}… was sent, but Razorpay rejected the key/secret pair.${requestId?` Request ID: ${requestId}`:""}`);
+    throw new Error(data?.error?.description||data?.error?.code||`Razorpay request failed (HTTP ${r.status})${requestId?` Request ID: ${requestId}`:""}`);
+  }
   return data;
 }
 async function schema(){
@@ -69,9 +73,7 @@ export default async function handler(req,res){
       try{
         qr=await razor("/payments/qr_codes","POST",{type:"upi_qr",name:`NRORA-${customerId}`,usage:"single_use",fixed_amount:true,payment_amount:450000,description:"NRORA Yearly Road Assistance Membership",notes:{customer_id:String(customerId),payment_id:String(p.rows[0].id),vehicle_no:String(customer.vehicle_no||"")}});
         await pool.query("update payments set qr_code_id=$1 where id=$2",[qr.id,p.rows[0].id]);
-      }catch(e){
-        qrError=e?.message||"QR generation failed";
-      }
+      }catch(e){qrError=e?.message||"QR generation failed";}
       return json(res,201,{orderId:order.id,keyId:RAZORPAY_KEY_ID,amount:450000,currency:"INR",paymentId:p.rows[0].id,customer,qr:qr?{id:qr.id,image_url:qr.image_url,image_content:qr.image_content,status:qr.status,close_by:qr.close_by}:null,qrError});
     }
     if(req.method==="POST"&&path==="verify"){
@@ -94,10 +96,7 @@ export default async function handler(req,res){
         try{
           const qrPayments=await razor(`/payments/qr_codes/${encodeURIComponent(row.qr_code_id)}/payments?count=10`);
           const qp=(qrPayments.items||[]).find(x=>x.status==="captured"&&Number(x.amount)===Number(row.amount)*100);
-          if(qp){
-            const done=await captureQr(row,qp);
-            if(done)return json(res,200,{...done.payment,customer_name:row.customer_name,phone:row.phone,vehicle_no:row.vehicle_no,receipt_no:done.receipt.receipt_no,receipt_created_at:done.receipt.created_at});
-          }
+          if(qp){const done=await captureQr(row,qp);if(done)return json(res,200,{...done.payment,customer_name:row.customer_name,phone:row.phone,vehicle_no:row.vehicle_no,receipt_no:done.receipt.receipt_no,receipt_created_at:done.receipt.created_at});}
         }catch(e){console.error("QR status check failed",e);}
       }
       const latest=await pool.query("select p.*,c.name customer_name,c.phone,c.vehicle_no,r.receipt_no,r.created_at receipt_created_at from payments p left join customers c on c.id=p.customer_id left join receipts r on r.payment_id=p.id where p.id=$1 limit 1",[row.id]);

@@ -13,8 +13,10 @@ jobs:
         uses: actions/checkout@v4
       - name: Patch Requests UI
         run: python scripts/patch_requests_ui.py
-      - name: Patch CEO session stability
+      - name: Patch CEO authority
         run: python scripts/patch_ceo_control.py
+      - name: Patch CEO session stability
+        run: python scripts/patch_ceo_session_stability.py
       - name: Commit change
         run: |
           git config user.name "github-actions[bot]"

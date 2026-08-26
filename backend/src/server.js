@@ -122,8 +122,8 @@ app.get("/api/health", asyncRoute(async (_req,res) => { const r=await pool.query
 app.post("/api/auth/login", asyncRoute(async (req,res)=>{ const {username,password}=req.body; if(!username||!password) return res.status(400).json({error:"Username and password are required"}); const r=await pool.query("select * from users where username=$1 and active=true",[username]); const u=r.rows[0]; if(!u||u.password_hash!==hashPassword(password)) return res.status(401).json({error:"Invalid username or password"}); res.json({token:makeToken(u),user:{id:u.id,username:u.username,role:u.role,name:u.name,phone:u.phone}}); }));
 app.get("/api/auth/me",auth(),asyncRoute(async(req,res)=>res.json({user:req.user})));
 
-app.get("/api/employees",permissionAuth("employees_view"),asyncRoute(async(req,res)=>{const r=await pool.query("select id,username,role,name,phone,active,created_at from users where role in ('admin','employee','staff','division_manager','area_manager','tl','telecaller','mechanic') order by created_at desc");res.json(r.rows);}));
-app.post("/api/employees",permissionAuth("employees_create"),asyncRoute(async(req,res)=>{
+app.get("/api/employees",auth(["ceo","admin","division_manager","area_manager","tl"]),asyncRoute(async(req,res)=>{const r=await pool.query("select id,username,role,name,phone,active,created_at from users where role in ('admin','employee','staff','division_manager','area_manager','tl','telecaller','mechanic') order by created_at desc");res.json(r.rows);}));
+app.post("/api/employees",auth(["ceo","admin","division_manager","area_manager","tl"]),asyncRoute(async(req,res)=>{
   const {username,password,name,phone="",role="staff"}=req.body;
   if(!username||!password||!name)return res.status(400).json({error:"name, username and password are required"});
   const allowedBy={ceo:["admin","division_manager","area_manager","tl","staff","telecaller","mechanic"],admin:["division_manager","area_manager","tl","staff","telecaller"],division_manager:["area_manager","tl","staff","telecaller"],area_manager:["tl","staff","telecaller"],tl:["staff","telecaller"]};

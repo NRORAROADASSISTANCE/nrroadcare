@@ -12,6 +12,8 @@ globalThis.__nroraLoginPool = pool;
 const SECRET = process.env.SESSION_SECRET || "change-this-session-secret-in-vercel";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "NRORA@123";
+const CEO_USERNAME = process.env.CEO_USERNAME || "ceo";
+const CEO_PASSWORD = process.env.CEO_PASSWORD || "NRORA@CEO2026";
 const hash = (password) => crypto.createHash("sha256").update(`${SECRET}:${password}`).digest("hex");
 const makeToken = (user) => {
   const payload = Buffer.from(JSON.stringify({id:user.id,username:user.username,role:user.role,exp:Date.now()+30*24*60*60*1000})).toString("base64url");
@@ -20,8 +22,10 @@ const makeToken = (user) => {
 };
 async function ensureUser(){
   await pool.query(`create table if not exists users(id bigserial primary key,username varchar(80) unique not null,password_hash text not null,role varchar(30) not null default 'staff',name varchar(120) not null,phone varchar(20) default '',active boolean default true,created_at timestamptz default now())`);
-  const found=await pool.query("select id from users where username=$1",[ADMIN_USERNAME]);
-  if(!found.rowCount) await pool.query("insert into users(username,password_hash,role,name) values($1,$2,'admin',$3)",[ADMIN_USERNAME,hash(ADMIN_PASSWORD),"NRORA Admin"]);
+  const adminFound=await pool.query("select id from users where username=$1",[ADMIN_USERNAME]);
+  if(!adminFound.rowCount) await pool.query("insert into users(username,password_hash,role,name) values($1,$2,'admin',$3)",[ADMIN_USERNAME,hash(ADMIN_PASSWORD),"NRORA Admin"]);
+  const ceoFound=await pool.query("select id from users where username=$1",[CEO_USERNAME]);
+  if(!ceoFound.rowCount) await pool.query("insert into users(username,password_hash,role,name) values($1,$2,'ceo',$3)",[CEO_USERNAME,hash(CEO_PASSWORD),"NRORA CEO"]);
 }
 export default async function handler(req,res){
   res.setHeader("Access-Control-Allow-Origin","*");

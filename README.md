@@ -9,6 +9,9 @@ Membership: ₹4,500/year
 - backend: Node.js + Express + PostgreSQL
 - database: PostgreSQL schema
 
+### CEO authority
+CEO controls Admin, Division Manager, Area Manager, TL, Staff, Telecaller and Mechanic roles.
+
 ## Local run
 ### Database
 Create a PostgreSQL database named `nrroadcare`, then run:

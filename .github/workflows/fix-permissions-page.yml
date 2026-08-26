@@ -1,0 +1,43 @@
+name: Fix CEO permissions page
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Patch Permissions component
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path("frontend/src/App.jsx")
+          text = path.read_text(encoding="utf-8")
+          start = text.find("function Permissions(){")
+          end = text.find("function SettingsPage(){", start)
+          if start < 0 or end < 0:
+              raise SystemExit("Permissions component boundaries not found")
+
+          replacement = r'''function Permissions(){const roles=["ceo","admin","division_manager","area_manager","tl","staff","telecaller","mechanic"];const groups=[{title:"Dashboard",items:["dashboard_view"]},{title:"Requests",items:["requests_view","requests_create","requests_manage"]},{title:"Customers",items:["customers_view","customers_create","customers_delete"]},{title:"Payments",items:["payments_view","payments_manage"]},{title:"Technicians",items:["technicians_view","technicians_manage"]},{title:"Employees",items:["employees_view","employees_create","employees_manage"]},{title:"Work Orders",items:["workorders_view","workorders_manage"]},{title:"Settings",items:["settings_view"]}];const[rows,setRows]=useState({}),[error,setError]=useState(""),[busy,setBusy]=useState("");const load=async()=>{try{setError("");const r=await api("/permissions");setRows(r.permissions||{})}catch(e){setError(e.message)}};useEffect(()=>{load()},[]);const toggle=async(role,permission,allowed)=>{if(role==="ceo")return;setBusy(`${role}:${permission}`);setError("");setRows(x=>({...x,[role]:{...(x[role]||{}),[permission]:allowed}}));try{await api("/permissions",{method:"PATCH",body:JSON.stringify({role,permission,allowed})})}catch(e){setError(e.message);await load()}finally{setBusy("")}};return <Page title="Permissions" sub="CEO controls what each role can access"><div className="card"><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}><div><h2><ShieldCheck size={18}/> Role Permissions</h2><p className="muted">Keep the existing CEO panel. Select the exact permissions each role should have.</p></div><button className="primary" type="button" onClick={load}>Refresh</button></div>{error&&<p className="error">{error}</p>}<div style={{display:"grid",gap:14,marginTop:16}}>{roles.map(role=><div key={role} className="card" style={{padding:16,border:"1px solid #dbe5f1"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:12}}><div><b style={{fontSize:17}}>{ROLE_LABELS[role]}</b><small style={{display:"block",color:"#667085",marginTop:3}}>{role==="ceo"?"Full access — locked":"Choose access below"}</small></div><span style={{fontSize:12,fontWeight:700,color:role==="ceo"?"#087f5b":"#2857d9"}}>{Object.keys(rows[role]||{}).filter(k=>rows[role]?.[k]).length} enabled</span></div><div style={{display:"grid",gap:12}}>{groups.map(group=><div key={group.title}><div style={{fontSize:12,fontWeight:800,textTransform:"uppercase",letterSpacing:.5,color:"#667085",marginBottom:6}}>{group.title}</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:7}}>{group.items.map(key=>{const checked=Boolean(rows[role]?.[key]);const pending=busy===`${role}:${key}`;return <label key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 10px",border:"1px solid #e4ebf4",borderRadius:9,background:checked?"#f4f8ff":"#fff",cursor:role==="ceo"?"not-allowed":"pointer",opacity:pending?.65:1}}><input type="checkbox" checked={checked} disabled={role==="ceo"||pending} onChange={e=>toggle(role,key,e.target.checked)}/><span>{PERMISSION_LABELS[key]}</span></label>})}</div></div>)}</div></div>)}</div></div></Page>}
+'''
+          path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
+          print("Permissions component patched")
+
+      - name: Commit patch and remove one-time workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/fix-permissions-page.yml
+          git add frontend/src/App.jsx .github/workflows/fix-permissions-page.yml
+          git commit -m "Fix CEO permissions page rendering" || exit 0
+          git push

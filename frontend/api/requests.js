@@ -17,7 +17,10 @@ function auth(req){
     return u;
   }catch{return null}
 }
-async function ensure(){await pool.query(`create table if not exists service_requests(id bigserial primary key,customer_id bigint references customers(id) on delete set null,status varchar(30) default 'pending',location text default '',description text default '',assigned_technician varchar(120) default '',created_at timestamptz default now())`)}
+async function ensure(){
+  await pool.query(`create table if not exists service_requests(id bigserial primary key,customer_id bigint references customers(id) on delete set null,status varchar(30) default 'pending',location text default '',description text default '',assigned_technician varchar(120) default '',created_at timestamptz default now())`);
+  await pool.query(`create table if not exists mechanic_orders(id bigserial primary key,request_id bigint unique references service_requests(id) on delete cascade,technician_id bigint references technicians(id) on delete set null,technician_name varchar(120) default '',status varchar(30) default 'sent',assigned_by bigint,created_at timestamptz default now(),accepted_at timestamptz,started_at timestamptz,completed_at timestamptz)`);
+}
 export default async function handler(req,res){
   res.setHeader("Access-Control-Allow-Origin","*");
   res.setHeader("Access-Control-Allow-Headers","Content-Type, Authorization");
@@ -27,13 +30,15 @@ export default async function handler(req,res){
   try{
     await ensure();
     if(req.method==="GET"){
-      const r=await pool.query("select sr.*,c.name customer_name,c.phone customer_phone,c.vehicle_no from service_requests sr left join customers c on c.id=sr.customer_id order by sr.created_at desc");
+      const r=await pool.query(`select sr.*,c.name customer_name,c.phone customer_phone,c.vehicle_no,mo.status mechanic_order_status,mo.technician_id,mo.technician_name from service_requests sr left join customers c on c.id=sr.customer_id left join mechanic_orders mo on mo.request_id=sr.id order by sr.created_at desc`);
       return json(res,200,r.rows);
     }
     const id=req.query?.id;
     if(req.method==="POST"){
       const {customer_id,location="",description=""}=req.body||{};
       if(!customer_id) return json(res,400,{error:"Customer is required"});
+      const c=await pool.query("select id from customers where id=$1 and coalesce(account_status,'active')='active'",[customer_id]);
+      if(!c.rowCount) return json(res,400,{error:"Verified active customer is required"});
       const r=await pool.query("insert into service_requests(customer_id,location,description) values($1,$2,$3) returning *",[customer_id,location,description]);
       return json(res,201,r.rows[0]);
     }
@@ -42,7 +47,22 @@ export default async function handler(req,res){
       const {status,assigned_technician}=req.body||{};
       const valid=["pending","assigned","on_the_way","completed","closed"];
       if(status && !valid.includes(status)) return json(res,400,{error:"Invalid request status"});
-      const r=await pool.query("update service_requests set status=coalesce($1,status),assigned_technician=coalesce($2,assigned_technician) where id=$3 returning *",[status||null,assigned_technician||null,id]);
+      if(assigned_technician!==undefined){
+        if(!assigned_technician) {
+          await pool.query("delete from mechanic_orders where request_id=$1",[id]);
+          const r=await pool.query("update service_requests set assigned_technician='',status=coalesce($1,status) where id=$2 returning *",[status||null,id]);
+          return r.rowCount?json(res,200,r.rows[0]):json(res,404,{error:"Request not found"});
+        }
+        const m=await pool.query("select id,name,phone,active from technicians where name=$1 and active=true limit 1",[assigned_technician]);
+        if(!m.rowCount) return json(res,400,{error:"Selected mechanic is not active or was not found"});
+        const tech=m.rows[0];
+        const r=await pool.query("update service_requests set status='assigned',assigned_technician=$1 where id=$2 returning *",[tech.name,id]);
+        if(!r.rowCount)return json(res,404,{error:"Request not found"});
+        await pool.query(`insert into mechanic_orders(request_id,technician_id,technician_name,status,assigned_by) values($1,$2,$3,'sent',$4) on conflict(request_id) do update set technician_id=excluded.technician_id,technician_name=excluded.technician_name,status='sent',assigned_by=excluded.assigned_by,accepted_at=null,started_at=null,completed_at=null`,[id,tech.id,tech.name,u.id]);
+        return json(res,200,{...r.rows[0],mechanic_order_sent:true,technician_id:tech.id,technician_name:tech.name});
+      }
+      const r=await pool.query("update service_requests set status=coalesce($1,status) where id=$2 returning *",[status||null,id]);
+      if(status && status==="completed") await pool.query("update mechanic_orders set status='completed',completed_at=coalesce(completed_at,now()) where request_id=$1",[id]);
       return r.rowCount?json(res,200,r.rows[0]):json(res,404,{error:"Request not found"});
     }
     return json(res,405,{error:"Method not allowed"});

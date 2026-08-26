@@ -16,12 +16,12 @@ p.write_text(s)
 # CEO control page links all operational modules to the same authenticated HashRouter.
 p = Path("frontend/ceo.html")
 s = p.read_text()
-old = 'token=r.token;localStorage.setItem("nrora_ceo_token",token);show()'
-new = 'token=r.token;localStorage.setItem("nrora_ceo_token",token);localStorage.setItem("nrora_token",token);show()'
+old = "token=r.token;localStorage.setItem('nrora_ceo_token',token);show()"
+new = "token=r.token;localStorage.setItem('nrora_ceo_token',token);localStorage.setItem('nrora_token',token);show()"
 if old in s:
     s = s.replace(old, new)
-old = 'logout.onclick=()=>{localStorage.removeItem("nrora_ceo_token");location.reload()}'
-new = 'logout.onclick=()=>{localStorage.removeItem("nrora_ceo_token");localStorage.removeItem("nrora_token");location.reload()}'
+old = "logout.onclick=()=>{localStorage.removeItem('nrora_ceo_token');location.reload()}"
+new = "logout.onclick=()=>{localStorage.removeItem('nrora_ceo_token');localStorage.removeItem('nrora_token');location.reload()}"
 if old in s:
     s = s.replace(old, new)
 marker = '<section class="card"><h2>⚙️ System Settings</h2>'
@@ -54,6 +54,10 @@ app.post("/api/employees",auth(["ceo","admin","division_manager","area_manager",
 }));
 '''
 s = s[:start] + block + s[end:]
+
+# CEO can enable/disable any employee account created in the hierarchy.
+s = s.replace('app.patch("/api/employees/:id",auth(["admin","division_manager","area_manager","tl"]),', 'app.patch("/api/employees/:id",auth(["ceo","admin","division_manager","area_manager","tl"]),')
+s = s.replace("where id=$2 and role in ('employee','staff','division_manager','area_manager','tl')", "where id=$2 and role in ('admin','employee','staff','division_manager','area_manager','tl','telecaller','mechanic')")
 
 repls = {
 'app.delete("/api/customers/:id",auth(["admin"]),': 'app.delete("/api/customers/:id",auth(["ceo","admin"]),',

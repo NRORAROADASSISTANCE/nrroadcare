@@ -30,6 +30,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add frontend/src/App.jsx
+          git commit -m "Add customer vehicle photo upload" || true
+          git pull --rebase origin main
           git rm .github/workflows/fix-customer-photo-upload.yml
-          git commit -m "Add customer vehicle photo upload"
-          git push
+          git commit -m "Remove one-time photo upload workflow" || true
+          git push origin main

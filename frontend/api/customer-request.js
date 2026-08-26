@@ -20,11 +20,11 @@ export default async function handler(req,res){
       if(!/^[0-9]{10}$/.test(String(phone))) return json(res,400,{error:"Enter a valid 10-digit mobile number"});
       const cleanPhone=String(phone).trim();
       const cleanVehicle=String(vehicle_no).trim().toUpperCase();
-      const customer=await pool.query("select id,name,phone,vehicle_no from customers where phone=$1 and upper(trim(vehicle_no))=$2 and coalesce(account_status,'active')='active' limit 1",[cleanPhone,cleanVehicle]);
+      const customer=await pool.query("select id,name,phone,vehicle_no from customers where phone=$1 and upper(trim(vehicle_no))=$2 limit 1",[cleanPhone,cleanVehicle]);
       if(!customer.rowCount) return json(res,403,{error:"Not Verified Customer. Please enter your registered mobile number and vehicle number."});
       const c=customer.rows[0];
-      const r=await pool.query("insert into service_requests(customer_id,customer_name,customer_phone,vehicle_no,location,description,photo_data,status) values($1,$2,$3,$4,$5,$6,$7,'pending') returning id,status,created_at",[c.id,c.name,c.phone,c.vehicle_no,location,description,photo_data]);
-      return json(res,201,{requestId:r.rows[0].id,status:r.rows[0].status,createdAt:r.rows[0].created_at,customerId:c.id});
+      const r=await pool.query("insert into service_requests(customer_id,customer_name,customer_phone,vehicle_no,location,description,photo_data,status) values($1,$2,$3,$4,$5,$6,$7,'pending') returning id,status,created_at",[c.id,c.name||name,c.phone, c.vehicle_no,location,description,photo_data]);
+      return json(res,201,{requestId:r.rows[0].id,status:r.rows[0].status,createdAt:r.rows[0].created_at,customerId:c.id,verifiedCustomer:true});
     }
     if(req.method==="GET"){
       const {id,phone}=req.query||{};

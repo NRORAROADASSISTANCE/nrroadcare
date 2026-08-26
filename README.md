@@ -11,6 +11,7 @@ Membership: ₹4,500/year
 
 ### CEO authority
 CEO controls Admin, Division Manager, Area Manager, TL, Staff, Telecaller and Mechanic roles.
+CEO modules use the same authenticated operations session; no second Admin login is required.
 
 ## Local run
 ### Database
@@ -33,11 +34,3 @@ npm run dev
 Set frontend VITE_API_URL to the HTTPS API URL.
 Set backend DATABASE_URL and FRONTEND_ORIGIN.
 Do not commit .env files or API keys.
-
-## Remaining production integrations
-- OTP/auth provider
-- UPI payment gateway/QR
-- PDF receipt generation
-- live GPS/service request workflow
-- notifications
-- HTTPS/domain DNS

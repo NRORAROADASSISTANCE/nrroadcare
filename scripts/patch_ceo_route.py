@@ -1,30 +1,32 @@
 from pathlib import Path
+import re
 
-# Keep CEO operations on the same authenticated app without falling into the Admin login.
+# CEO operations must use the same authenticated React app without falling into
+# the normal Admin/Employee login. Patch the Login component by function boundary
+# instead of depending on one exact minified string.
 p = Path("frontend/src/App.jsx")
 s = p.read_text(encoding="utf-8")
 
-old = 'function Login({onLogin}){const[f,setF]=useState({username:"admin",password:""}),[error,setError]=useState("");const submit=async e=>{e.preventDefault();setError("");try{const r=await api("/auth/login",{method:"POST",body:JSON.stringify(f)});if(r.user.role==="ceo"){localStorage.setItem("nrora_ceo_token",r.token);localStorage.setItem("nrora_token",r.token)}else{localStorage.removeItem("nrora_ceo_token");localStorage.setItem("nrora_token",r.token)}onLogin(r.user);if(r.user.role==="mechanic")window.location.href="/mechanic-orders.html"}catch(e){setError(e.message)}};return <div className="login"><div className="login-card"><div className="brand"><div className="logo">NR</div><div><b>NRORA</b><small>Admin / Employee / Mechanic Login</small></div></div><h1>Sign in</h1><form onSubmit={submit}><label>USERNAME<input value={f.username} onChange={e=>setF({...f,username:e.target.value})}/></label><label>PASSWORD<input type="password" value={f.password} onChange={e=>setF({...f,password:e.target.value})}/></label>{error&&<p className="error">{error}</p>}<button className="primary">Login</button></form></div></div>}'
-new = 'function Login({onLogin}){const ceoMode=new URLSearchParams(window.location.search).get("ceo")==="1";const[f,setF]=useState({username:ceoMode?"ceo":"admin",password:""}),[error,setError]=useState("");const submit=async e=>{e.preventDefault();setError("");try{const r=await api("/auth/login",{method:"POST",body:JSON.stringify(f)});if(ceoMode&&r.user.role!=="ceo")throw new Error("CEO login required");if(r.user.role==="ceo"){localStorage.setItem("nrora_ceo_token",r.token);localStorage.setItem("nrora_token",r.token)}else{localStorage.removeItem("nrora_ceo_token");localStorage.setItem("nrora_token",r.token)}onLogin(r.user);if(r.user.role==="mechanic")window.location.href="/mechanic-orders.html"}catch(e){setError(e.message)}};return <div className="login"><div className="login-card"><div className="brand"><div className="logo">NR</div><div><b>NRORA</b><small>{ceoMode?"CEO Operations Login":"Admin / Employee / Mechanic Login"}</small></div></div><h1>{ceoMode?"CEO Sign in":"Sign in"}</h1><form onSubmit={submit}><label>USERNAME<input value={f.username} onChange={e=>setF({...f,username:e.target.value})}/></label><label>PASSWORD<input type="password" value={f.password} onChange={e=>setF({...f,password:e.target.value})}/></label>{error&&<p className="error">{error}</p>}<button className="primary">{ceoMode?"CEO Login":"Login"}</button></form></div></div>}'
-if old in s:
-    s = s.replace(old, new)
+login = '''function Login({onLogin}){const ceoMode=new URLSearchParams(window.location.search).get("ceo")==="1";const[f,setF]=useState({username:ceoMode?"ceo":"admin",password:""}),[error,setError]=useState("");const submit=async e=>{e.preventDefault();setError("");try{const r=await api("/auth/login",{method:"POST",body:JSON.stringify(f)});if(ceoMode&&r.user.role!=="ceo")throw new Error("CEO login required");if(r.user.role==="ceo"){localStorage.setItem("nrora_ceo_token",r.token);localStorage.setItem("nrora_token",r.token)}else{localStorage.removeItem("nrora_ceo_token");localStorage.setItem("nrora_token",r.token)}onLogin(r.user);if(r.user.role==="mechanic")window.location.href="/mechanic-orders.html"}catch(e){setError(e.message)}};return <div className="login"><div className="login-card"><div className="brand"><div className="logo">NR</div><div><b>NRORA</b><small>{ceoMode?"CEO Operations Login":"Admin / Employee / Mechanic Login"}</small></div></div><h1>{ceoMode?"CEO Sign in":"Sign in"}</h1><form onSubmit={submit}><label>USERNAME<input value={f.username} onChange={e=>setF({...f,username:e.target.value})}/></label><label>PASSWORD<input type="password" value={f.password} onChange={e=>setF({...f,password:e.target.value})}/></label>{error&&<p className="error">{error}</p>}<button className="primary">{ceoMode?"CEO Login":"Login"}</button></form></div></div>}'''
+
+m = re.search(r'function Login\(\{onLogin\}\)\{.*?(?=function Layout\(\{user,onLogout\}\))', s, flags=re.S)
+if m:
+    s = s[:m.start()] + login + "\n" + s[m.end():]
 else:
-    print("CEO Login already patched; continuing")
+    raise SystemExit("Could not locate Login component")
 
-# Restore the CEO panel structure and add a stable role-permission matrix without
-# changing the existing sidebar or other CEO pages.
-start = s.find("function Permissions(){")
-end = s.find("function SettingsPage(){", start)
-if start < 0 or end < 0:
-    raise SystemExit("Permissions component boundaries not found")
+# Always prefer the CEO token if it exists, even if an old Admin token is present.
+s = s.replace('const getToken=()=>localStorage.getItem("nrora_token")||localStorage.getItem("nrora_ceo_token");',
+              'const getToken=()=>localStorage.getItem("nrora_ceo_token")||localStorage.getItem("nrora_token");')
 
-replacement = r'''function Permissions(){const roles=["ceo","admin","division_manager","area_manager","tl","staff","telecaller","mechanic"];const groups=[{title:"Dashboard",items:["dashboard_view"]},{title:"Requests",items:["requests_view","requests_create","requests_manage"]},{title:"Customers",items:["customers_view","customers_create","customers_delete"]},{title:"Payments",items:["payments_view","payments_manage"]},{title:"Technicians",items:["technicians_view","technicians_manage"]},{title:"Employees",items:["employees_view","employees_create","employees_manage"]},{title:"Work Orders",items:["workorders_view","workorders_manage"]},{title:"Settings",items:["settings_view"]}];const[rows,setRows]=useState({}),[error,setError]=useState(""),[busy,setBusy]=useState("");const load=async()=>{try{setError("");const r=await api("/permissions");setRows(r.permissions||{})}catch(e){setError(e.message)}};useEffect(()=>{load()},[]);const toggle=async(role,permission,allowed)=>{if(role==="ceo")return;setBusy(`${role}:${permission}`);setError("");setRows(x=>({...x,[role]:{...(x[role]||{}),[permission]:allowed}}));try{await api("/permissions",{method:"PATCH",body:JSON.stringify({role,permission,allowed})})}catch(e){setError(e.message);await load()}finally{setBusy("")}};return <Page title="Permissions" sub="CEO controls what each role can access"><div className="card"><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}><div><h2><ShieldCheck size={18}/> Role Permissions</h2><p className="muted">Keep the existing CEO panel. Select the exact permissions each role should have.</p></div><button className="primary" type="button" onClick={load}>Refresh</button></div>{error&&<p className="error">{error}</p>}<div style={{display:"grid",gap:14,marginTop:16}}>{roles.map(role=><div key={role} className="card" style={{padding:16,border:"1px solid #dbe5f1"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:12}}><div><b style={{fontSize:17}}>{ROLE_LABELS[role]}</b><small style={{display:"block",color:"#667085",marginTop:3}}>{role==="ceo"?"Full access — locked":"Choose access below"}</small></div><span style={{fontSize:12,fontWeight:700,color:role==="ceo"?"#087f5b":"#2857d9"}}>{Object.keys(rows[role]||{}).filter(k=>rows[role]?.[k]).length} enabled</span></div><div style={{display:"grid",gap:12}}>{groups.map(group=><div key={group.title}><div style={{fontSize:12,fontWeight:800,textTransform:"uppercase",letterSpacing:.5,color:"#667085",marginBottom:6}}>{group.title}</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:7}}>{group.items.map(key=>{const checked=Boolean(rows[role]?.[key]);const pending=busy===`${role}:${key}`;return <label key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 10px",border:"1px solid #e4ebf4",borderRadius:9,background:checked?"#f4f8ff":"#fff",cursor:role==="ceo"?"not-allowed":"pointer",opacity:pending?.65:1}}><input type="checkbox" checked={checked} disabled={role==="ceo"||pending} onChange={e=>toggle(role,key,e.target.checked)}/><span>{PERMISSION_LABELS[key]}</span></label>})}</div></div>)}</div></div>)}</div></div></Page>}
-'''
-s = s[:start] + replacement + s[end:]
 p.write_text(s, encoding="utf-8")
 
+# Keep CEO navigation explicitly in CEO mode. These links intentionally open the
+# React application with ?ceo=1 so Login renders CEO mode if a session is missing.
 p = Path("frontend/ceo.html")
 s = p.read_text(encoding="utf-8")
-for route in ["/","/requests","/customers","/technicians","/employees","/settings","/contact"]:
-    s = s.replace(f'href="/#' + route, f'href="/?ceo=1#' + route)
+for route in ["/", "/requests", "/customers", "/technicians", "/employees", "/settings", "/contact", "/permissions"]:
+    s = s.replace(f'href="/?ceo=1#{route}"', f'href="/?ceo=1#{route}"')
+# Remove the old Admin-oriented explanatory text if present.
+s = s.replace('They will not send you back to the Admin login.', 'CEO session is preserved across every operation.')
 p.write_text(s, encoding="utf-8")

@@ -12,6 +12,7 @@ Membership: ₹4,500/year
 ### CEO authority
 CEO controls Admin, Division Manager, Area Manager, TL, Staff, Telecaller and Mechanic roles.
 CEO modules use the same authenticated operations session; no second Admin login is required.
+CEO can enable/disable the employee accounts it creates.
 
 ## Local run
 ### Database

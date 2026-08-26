@@ -4,7 +4,7 @@ const { Pool } = pg;
 const pool = globalThis.__nroraRequestsPool || new Pool({ connectionString: process.env.DATABASE_URL, max: 5, idleTimeoutMillis: 10000 });
 globalThis.__nroraRequestsPool = pool;
 const SECRET = process.env.SESSION_SECRET || "change-this-session-secret-in-vercel";
-const allowed = ["admin","division_manager","area_manager","tl","staff"];
+const allowed = ["admin","division_manager","area_manager","tl","staff","telecaller"];
 const json=(res,status,body)=>res.status(status).json(body);
 function auth(req){
   const t=(req.headers.authorization||"").replace(/^Bearer\s+/i,"");

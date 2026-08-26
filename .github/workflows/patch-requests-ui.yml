@@ -17,14 +17,16 @@ jobs:
         run: python scripts/patch_ceo_control.py
       - name: Patch CEO session stability
         run: python scripts/patch_ceo_session_stability.py
+      - name: Patch CEO route handoff
+        run: python scripts/patch_ceo_route.py
       - name: Commit change
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add frontend/src/App.jsx frontend/ceo.html backend/src/server.js README.md
+          git add frontend/src/App.jsx frontend/ceo.html backend/src/server.js README.md scripts/patch_ceo_route.py
           if git diff --cached --quiet; then
             echo "No UI change needed"
             exit 0
           fi
-          git commit -m "Stabilize CEO session and authority"
+          git commit -m "Fix CEO operations route handoff"
           git push

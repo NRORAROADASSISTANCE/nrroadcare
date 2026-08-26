@@ -1,0 +1,39 @@
+name: Remove public admin login
+
+on:
+  push:
+    paths-ignore:
+      - '.github/workflows/remove-public-admin-login.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  remove-admin-link:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Remove staff admin link from public page
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('frontend/public/public-site.html')
+          s = p.read_text(encoding='utf-8')
+          target = '<a class="btn alt" href="/#/admin">Staff / Admin Login</a>'
+          if target in s:
+              p.write_text(s.replace(target, ''), encoding='utf-8')
+          PY
+
+      - name: Commit change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/public/public-site.html
+          if git diff --cached --quiet; then
+            echo "No change needed"
+            exit 0
+          fi
+          git commit -m "Hide admin login from public website"
+          git push

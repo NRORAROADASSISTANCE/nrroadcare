@@ -2,7 +2,7 @@ import React,{useEffect,useState} from "react";
 import {Routes,Route,NavLink,Navigate,useNavigate} from "react-router-dom";
 import {Home,Users,MapPin,Settings,Phone,Globe,Map,UserPlus,Menu,X,Plus,Trash2,UserCog,LogOut,ShieldCheck,QrCode,Receipt,ExternalLink,CheckCircle,Clock} from "lucide-react";
 const API="/api"; const phone="9160264439",domain="nrroadcare.in",UPI_ID="9000264439-4@ybl",MEMBERSHIP_AMOUNT=4500;
-const getToken=()=>localStorage.getItem("nrora_token");
+const getToken=()=>localStorage.getItem("nrora_token")||localStorage.getItem("nrora_ceo_token");
 const api=async(path,options={})=>{const headers={...(options.body?{"Content-Type":"application/json"}:{}),...(getToken()?{Authorization:`Bearer ${getToken()}`}:{})};const r=await fetch(`${API}${path}`,{...options,headers});if(!r.ok){let e={};try{e=await r.json()}catch{};throw new Error(e.error||`Request failed (${r.status})`)}return r.status===204?null:r.json()};
 const ROLE_LABELS={ceo:"CEO",division_manager:"Division Manager",area_manager:"Area Manager",tl:"TL",staff:"Staff",telecaller:"Telecaller",mechanic:"Mechanic"};
 const canManageEmployees=r=>["ceo","admin","division_manager","area_manager","tl"].includes(r);

@@ -3,6 +3,8 @@
   "rewrites": [
     { "source": "/requests", "destination": "/requests.html" },
     { "source": "/contact", "destination": "/contact.html" },
+    { "source": "/ceo", "destination": "/ceo.html" },
+    { "source": "/ceo.html", "destination": "/ceo.html" },
     { "source": "/((?!api\\/.*).*)", "destination": "/index.html" }
   ]
 }

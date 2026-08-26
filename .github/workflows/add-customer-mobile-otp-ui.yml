@@ -14,16 +14,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Patch CEO authority
+        run: python scripts/patch_ceo_control.py
       - name: Patch customer UI
         run: python scripts/patch_customer_ui.py
       - name: Commit change
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add frontend/src/App.jsx
+          git add frontend/src/App.jsx frontend/ceo.html backend/src/server.js
           if git diff --cached --quiet; then
-            echo "No UI change needed"
+            echo "No CEO/customer UI change needed"
             exit 0
           fi
-          git commit -m "Add customer mobile OTP verification flow"
+          git commit -m "Fix CEO operations and employee role authority"
           git push

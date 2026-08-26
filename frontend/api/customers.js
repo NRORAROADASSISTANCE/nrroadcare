@@ -21,6 +21,7 @@ const readUser = req => {
 };
 
 export default async function customersHandler(req,res) {
+  if(req.method === "POST") return json(res,409,{error:"Direct customer creation is disabled. Verify the customer mobile number by OTP first."});
   if(req.method === "DELETE"){
     const user = readUser(req);
     if(!user) return json(res,401,{error:"Unauthorized"});

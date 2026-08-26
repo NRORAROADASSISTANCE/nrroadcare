@@ -1,5 +1,5 @@
 from pathlib import Path
-
+# Customer OTP UI patcher
 p = Path('frontend/src/App.jsx')
 s = p.read_text(encoding='utf-8')
 if 'Customer mobile OTP verification' in s:

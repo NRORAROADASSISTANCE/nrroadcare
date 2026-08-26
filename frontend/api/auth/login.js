@@ -14,35 +14,102 @@ const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "NRORA@123";
 const CEO_USERNAME = process.env.CEO_USERNAME || "ceo";
 const CEO_PASSWORD = process.env.CEO_PASSWORD || "NRORA@CEO2026";
+
 const hash = (password) => crypto.createHash("sha256").update(`${SECRET}:${password}`).digest("hex");
 const makeToken = (user) => {
-  const payload = Buffer.from(JSON.stringify({id:user.id,username:user.username,role:user.role,exp:Date.now()+30*24*60*60*1000})).toString("base64url");
-  const signature = crypto.createHmac("sha256", SECRET).update(`${user.id}:${user.username}:${user.role}`).digest("hex");
+  const payload = Buffer.from(JSON.stringify({
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    exp: Date.now() + 30 * 24 * 60 * 60 * 1000
+  })).toString("base64url");
+  const signature = crypto.createHmac("sha256", SECRET)
+    .update(`${user.id}:${user.username}:${user.role}`)
+    .digest("hex");
   return `${payload}.${signature}`;
 };
-async function ensureUser(){
-  await pool.query(`create table if not exists users(id bigserial primary key,username varchar(80) unique not null,password_hash text not null,role varchar(30) not null default 'staff',name varchar(120) not null,phone varchar(20) default '',active boolean default true,created_at timestamptz default now())`);
-  const adminFound=await pool.query("select id from users where username=$1",[ADMIN_USERNAME]);
-  if(!adminFound.rowCount) await pool.query("insert into users(username,password_hash,role,name) values($1,$2,'admin',$3)",[ADMIN_USERNAME,hash(ADMIN_PASSWORD),"NRORA Admin"]);
-  const ceoFound=await pool.query("select id from users where username=$1",[CEO_USERNAME]);
-  if(!ceoFound.rowCount) await pool.query("insert into users(username,password_hash,role,name) values($1,$2,'ceo',$3)",[CEO_USERNAME,hash(CEO_PASSWORD),"NRORA CEO"]);
+
+async function ensureUser() {
+  await pool.query(`create table if not exists users(
+    id bigserial primary key,
+    username varchar(80) unique not null,
+    password_hash text not null,
+    role varchar(30) not null default 'staff',
+    name varchar(120) not null,
+    phone varchar(20) default '',
+    active boolean default true,
+    created_at timestamptz default now()
+  )`);
+
+  // CEO is the highest authority and must exist before CEO login is attempted.
+  const ceo = await pool.query("select id from users where username=$1", [CEO_USERNAME]);
+  if (!ceo.rowCount) {
+    await pool.query(
+      "insert into users(username,password_hash,role,name) values($1,$2,'ceo',$3)",
+      [CEO_USERNAME, hash(CEO_PASSWORD), "NRORA CEO"]
+    );
+  } else {
+    // Ensure the reserved CEO username always remains a CEO account.
+    await pool.query(
+      "update users set role='ceo', name='NRORA CEO', password_hash=$1, active=true where username=$2",
+      [hash(CEO_PASSWORD), CEO_USERNAME]
+    );
+  }
+
+  const found = await pool.query("select id from users where username=$1", [ADMIN_USERNAME]);
+  if (!found.rowCount) {
+    await pool.query(
+      "insert into users(username,password_hash,role,name) values($1,$2,'admin',$3)",
+      [ADMIN_USERNAME, hash(ADMIN_PASSWORD), "NRORA Admin"]
+    );
+  }
 }
-export default async function handler(req,res){
-  res.setHeader("Access-Control-Allow-Origin","*");
-  res.setHeader("Access-Control-Allow-Headers","Content-Type, Authorization");
-  res.setHeader("Access-Control-Allow-Methods","POST, OPTIONS");
-  if(req.method==="OPTIONS") return res.status(204).end();
-  if(req.method!=="POST") return res.status(405).json({error:"Method Not Allowed"});
-  try{
+
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
+
+  try {
     await ensureUser();
-    const {username,password}=req.body||{};
-    if(!username||!password)return res.status(400).json({error:"Username and password are required"});
-    const result=await pool.query("select * from users where username=$1 and active=true",[username]);
-    const user=result.rows[0];
-    if(user&&user.password_hash===hash(password)) return res.status(200).json({token:makeToken(user),user:{id:user.id,username:user.username,role:user.role,name:user.name,phone:user.phone}});
-    const mech=await pool.query("select id,name,phone,username,password_hash,active from technicians where username=$1 and active=true",[username]);
-    const m=mech.rows[0];
-    if(m&&m.password_hash===hash(password)) return res.status(200).json({token:makeToken({id:m.id,username:m.username,role:"mechanic",name:m.name,phone:m.phone}),user:{id:m.id,username:m.username,role:"mechanic",name:m.name,phone:m.phone}});
-    return res.status(401).json({error:"Invalid username or password"});
-  }catch(error){console.error("NRORA login error",error);return res.status(500).json({error:"Login service error"});}
+    const { username, password } = req.body || {};
+    if (!username || !password) return res.status(400).json({ error: "Username and password are required" });
+
+    const result = await pool.query(
+      "select * from users where username=$1 and active=true",
+      [username]
+    );
+    const user = result.rows[0];
+    if (user && user.password_hash === hash(password)) {
+      return res.status(200).json({
+        token: makeToken(user),
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          name: user.name,
+          phone: user.phone
+        }
+      });
+    }
+
+    const mech = await pool.query(
+      "select id,name,phone,username,password_hash,active from technicians where username=$1 and active=true",
+      [username]
+    );
+    const m = mech.rows[0];
+    if (m && m.password_hash === hash(password)) {
+      return res.status(200).json({
+        token: makeToken({ id: m.id, username: m.username, role: "mechanic", name: m.name, phone: m.phone }),
+        user: { id: m.id, username: m.username, role: "mechanic", name: m.name, phone: m.phone }
+      });
+    }
+
+    return res.status(401).json({ error: "Invalid username or password" });
+  } catch (error) {
+    console.error("NRORA login error", error);
+    return res.status(500).json({ error: "Login service error" });
+  }
 }

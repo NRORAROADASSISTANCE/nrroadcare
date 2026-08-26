@@ -4,12 +4,10 @@ import { HashRouter } from "react-router-dom";
 import App from "./App.jsx";
 import "./styles.css";
 
-// CEO Control opens the same operations UI. Reuse the CEO session automatically
-// so opening any module never falls back to the Admin login screen.
-if(!localStorage.getItem("nrora_token")){
-  const ceoToken=localStorage.getItem("nrora_ceo_token");
-  if(ceoToken) localStorage.setItem("nrora_token",ceoToken);
-}
+// CEO is the highest authority. Always prefer the CEO session when one exists,
+// so a stale Admin/Employee token can never redirect CEO into the Admin login.
+const ceoToken = localStorage.getItem("nrora_ceo_token");
+if (ceoToken) localStorage.setItem("nrora_token", ceoToken);
 
 class AppErrorBoundary extends React.Component {
   constructor(props){

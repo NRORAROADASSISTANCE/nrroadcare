@@ -14,6 +14,9 @@ CEO controls Admin, Division Manager, Area Manager, TL, Staff, Telecaller and Me
 CEO modules use the same authenticated operations session; no second Admin login is required.
 CEO can enable/disable the employee accounts it creates.
 
+## Production deployment checkpoint
+CEO panel completed: navigation, employee role management, permissions, settings, requests, customers, technicians, payments and contact are maintained under the CEO console.
+
 ## Local run
 ### Database
 Create a PostgreSQL database named `nrroadcare`, then run:

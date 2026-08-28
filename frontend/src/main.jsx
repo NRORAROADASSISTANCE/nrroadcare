@@ -3,11 +3,15 @@ import { createRoot } from "react-dom/client";
 import { HashRouter } from "react-router-dom";
 import App from "./App.jsx";
 import CeoApp from "./CeoApp.jsx";
+import MechanicApp from "./MechanicApp.jsx";
 import "./styles.css";
 
 const isCeoMode = new URLSearchParams(window.location.search).get("ceo") === "1";
 const ceoToken = localStorage.getItem("nrora_ceo_token");
 if (ceoToken) localStorage.setItem("nrora_token", ceoToken);
+const currentToken = localStorage.getItem("nrora_token") || "";
+let tokenRole = "";
+try { const [p] = currentToken.split("."); tokenRole = JSON.parse(atob(p.replace(/-/g,"+").replace(/_/g,"/"))).role || ""; } catch {}
 
 class AppErrorBoundary extends React.Component {
   constructor(props){super(props);this.state={error:null};}
@@ -31,6 +35,8 @@ class AppErrorBoundary extends React.Component {
 const root=createRoot(document.getElementById("root"));
 if(isCeoMode && ceoToken){
   root.render(<AppErrorBoundary><CeoApp/></AppErrorBoundary>);
+}else if(tokenRole==="mechanic"){
+  root.render(<AppErrorBoundary><MechanicApp/></AppErrorBoundary>);
 }else{
   root.render(<HashRouter><AppErrorBoundary><App/></AppErrorBoundary></HashRouter>);
 }

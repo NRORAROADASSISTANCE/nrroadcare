@@ -1,0 +1,69 @@
+name: Remove customer OTP mandatory flow
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch customer creation flow
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          app = Path('frontend/src/App.jsx')
+          s = app.read_text()
+
+          s = s.replace(
+              'OTP verification is mandatory. The customer account becomes active only after the mobile number is verified.',
+              'Enter the customer details and save. Payment is verified through the bank/gateway before membership activation.'
+          )
+          s = s.replace('Save & Send Mobile OTP', 'Save Customer')
+          s = s.replace('No verified customers yet. Customer records appear here only after OTP verification.', 'No customers yet. Saved customers will appear here.')
+
+          pattern = r'const add=async e=>\{.*?\};const verify='
+          replacement = '''const add=async e=>{e.preventDefault();setError("");setBusy(true);try{await api("/customers",{method:"POST",body:JSON.stringify({name:f.name,phone:f.phone,address:f.address,vehicle_no:f.vehicle_no,vehicle_photos:[f.photo1,f.photo2].filter(Boolean)})});setF(blank);await load()}catch(e){setError(e.message)}finally{setBusy(false)}};const verify='''
+          s2, n = re.subn(pattern, replacement, s, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit('Could not locate customer add flow')
+          s = s2
+
+          app.write_text(s)
+
+          api = Path('frontend/api/[...path].js')
+          s = api.read_text()
+          old_schema = "create table if not exists customers(id bigserial primary key,name varchar(120) not null,phone varchar(20) not null,address text default '',vehicle_no varchar(30) not null,created_at timestamptz default now());"
+          new_schema = old_schema + "\nalter table customers add column if not exists mobile_verified boolean not null default false;\nalter table customers add column if not exists account_status varchar(20) not null default 'inactive';\nalter table customers add column if not exists vehicle_photos jsonb not null default '[]'::jsonb;"
+          if old_schema not in s:
+              raise SystemExit('Could not locate customer schema')
+          s = s.replace(old_schema, new_schema, 1)
+
+          old_post = '''if(req.method==="POST"&&path==="customers"){const u=requireAuth(req,res,["ceo","admin","division_manager","area_manager","tl","staff"]);if(!u)return;return json(res,409,{error:"Direct customer creation is disabled. Verify the customer mobile number by OTP first."})}'''
+          new_post = '''if(req.method==="POST"&&path==="customers"){const u=requireAuth(req,res,["ceo","admin","division_manager","area_manager","tl","staff"]);if(!u)return;const{name,phone,address="",vehicle_no,vehicle_photos=[]}=req.body||{};if(!name||!phone||!vehicle_no)return json(res,400,{error:"Name, mobile number and vehicle number are required"});const mobile=String(phone).replace(/\\D/g,"");if(mobile.length!==10)return json(res,400,{error:"Enter a valid 10-digit mobile number"});const exists=await pool.query("select id from customers where phone=$1",[phone]);if(exists.rowCount)return json(res,409,{error:"A customer account already exists for this mobile number"});const r=await pool.query("insert into customers(name,phone,address,vehicle_no,mobile_verified,account_status,vehicle_photos) values($1,$2,$3,$4,false,'inactive',$5) returning *",[name,phone,address,vehicle_no,JSON.stringify(Array.isArray(vehicle_photos)?vehicle_photos.slice(0,5):[])]);return json(res,201,{ok:true,customer:r.rows[0],message:"Customer saved. Membership will activate after successful payment and bank/gateway verification."})}'''
+          if old_post not in s:
+              raise SystemExit('Could not locate customer POST route')
+          s = s.replace(old_post, new_post, 1)
+          api.write_text(s)
+          PY
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/src/App.jsx frontend/api/[...path].js
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "Fix customer activation flow [skip ci]"
+          git push

@@ -1,0 +1,48 @@
+name: Finalize customer payment activation flow
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Finalize UI and activation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('frontend/src/App.jsx')
+          s = app.read_text()
+          s = s.replace('{busy?"Sending OTP…":"Save Customer"}', '{busy?"Saving…":"Save Customer"}')
+          app.write_text(s)
+
+          pay = Path('frontend/api/payments/[...path].js')
+          s = pay.read_text()
+          old = '''async function activateMembership(customerId,amount){const existing=await pool.query("select * from memberships where customer_id=$1 and renewal_date>=current_date order by id desc limit 1",[customerId]);if(existing.rowCount)return existing.rows[0];const r=await pool.query("insert into memberships(customer_id,amount,renewal_date) values($1,$2,(current_date + interval '1 year')::date) returning *",[customerId,amount]);return r.rows[0];}'''
+          new = '''async function activateMembership(customerId,amount){await pool.query("update customers set account_status='active' where id=$1",[customerId]);const existing=await pool.query("select * from memberships where customer_id=$1 and renewal_date>=current_date order by id desc limit 1",[customerId]);if(existing.rowCount)return existing.rows[0];const r=await pool.query("insert into memberships(customer_id,amount,renewal_date) values($1,$2,(current_date + interval '1 year')::date) returning *",[customerId,amount]);return r.rows[0];}'''
+          if old not in s:
+              raise SystemExit('Could not locate membership activation function')
+          s = s.replace(old, new, 1)
+          pay.write_text(s)
+          PY
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/src/App.jsx frontend/api/payments/[...path].js
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "Finalize customer payment activation flow [skip ci]"
+          git push

@@ -5,8 +5,8 @@
     { "source": "/contact", "destination": "/contact.html" },
     { "source": "/ceo", "destination": "/ceo.html" },
     { "source": "/ceo.html", "destination": "/ceo.html" },
-    { "source": "/customer-register", "destination": "/register.html" },
-    { "source": "/register", "destination": "/register.html" },
-    { "source": "/((?!api\\/.*).*)", "destination": "/index.html" }
+    { "source": "/customer-register", "destination": "/customer-register.html" },
+    { "source": "/register", "destination": "/customer-register.html" },
+    { "source": "/((?!api\\/.*|.*\\.html$).*)", "destination": "/index.html" }
   ]
 }

@@ -14,41 +14,43 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Patch session duration and customer delete
+      - name: Patch authentication persistence and customer overlay
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
-          p = Path('backend/src/server.js')
+          p = Path('frontend/index.html')
           s = p.read_text()
-          old = 'exp:Date.now()+1000*60*60*12'
-          new = 'exp:Date.now()+1000*60*60*24*90'
-          if old in s:
-              s = s.replace(old, new, 1)
-              print('Session lifetime changed from 12 hours to 90 days')
-          else:
-              print('Session lifetime pattern already patched')
-          p.write_text(s)
+          new_auth = '<script>(function(){try{var T="nrora_token",C="nrora_ceo_token",B="nrora_session_backup",L="nrora_logged_out";function sync(){var t=localStorage.getItem(T)||localStorage.getItem(C);if(t){localStorage.setItem(B,t);localStorage.removeItem(L)}else if(!localStorage.getItem(L)){var b=localStorage.getItem(B);if(b)localStorage.setItem(T,b)}}sync();window.addEventListener("nrora-auth-changed",sync);document.addEventListener("click",function(e){var el=e.target&&e.target.closest?e.target.closest("button"):null;if(el&&/\\blogout\\b/i.test((el.textContent||"").trim())){localStorage.setItem(L,"1");localStorage.removeItem(T);localStorage.removeItem(C);localStorage.removeItem(B);window.dispatchEvent(new Event("nrora-auth-changed"));location.hash="/"}},true)}catch(e){}})();</script>'
+          s2,n = re.subn(r'<script>\(function\(\)\{try\{var T="nrora_token".*?</script>', new_auth, s, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit('Could not locate persistent login script')
+          p.write_text(s2)
 
-          p = Path('frontend/src/App.jsx')
+          p = Path('frontend/src/CustomerDetailsOverlayFixed.jsx')
           s = p.read_text()
-          old = 'api(`/customers?id=${encodeURIComponent(id)}`,{method:"DELETE"})'
-          new = 'api(`/customers/${encodeURIComponent(id)}`,{method:"DELETE"})'
-          if old in s:
-              s = s.replace(old, new, 1)
-              print('Customer delete route fixed')
-          else:
-              print('Customer delete route already patched')
+          old = 'useEffect(()=>{const c=()=>setShow(location.hash.startsWith("#/customers"));c();window.addEventListener("hashchange",c);return()=>window.removeEventListener("hashchange",c)},[])'
+          new = 'useEffect(()=>{const c=()=>setShow(location.hash.startsWith("#/customers")&&!!(localStorage.getItem("nrora_token")||localStorage.getItem("nrora_ceo_token")));c();window.addEventListener("hashchange",c);window.addEventListener("nrora-auth-changed",c);return()=>{window.removeEventListener("hashchange",c);window.removeEventListener("nrora-auth-changed",c)}},[])'
+          if old not in s:
+              raise SystemExit('Could not locate customer overlay auth effect')
+          s=s.replace(old,new,1)
+          old='if(!show)return null;'
+          new='if(!show || !(localStorage.getItem("nrora_token")||localStorage.getItem("nrora_ceo_token")))return null;'
+          if old not in s:
+              raise SystemExit('Could not locate customer overlay render guard')
+          s=s.replace(old,new,1)
           p.write_text(s)
+          print('Authentication persistence and logout overlay fixes applied')
           PY
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backend/src/server.js frontend/src/App.jsx
+          git add frontend/index.html frontend/src/CustomerDetailsOverlayFixed.jsx
           if git diff --cached --quiet; then
             echo "No changes needed"
             exit 0
           fi
-          git commit -m "Fix persistent sessions and customer delete route [skip ci]"
+          git commit -m "Fix refresh session and hide customer button after logout [skip ci]"
           git push

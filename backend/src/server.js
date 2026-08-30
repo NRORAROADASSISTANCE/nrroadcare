@@ -34,7 +34,7 @@ app.post("/api/payments/webhook", express.raw({type:"application/json"}), async 
 app.use(express.json());
 const asyncRoute = fn => (req,res,next) => Promise.resolve(fn(req,res,next)).catch(next);
 const hashPassword = password => crypto.createHash("sha256").update(`${SESSION_SECRET}:${password}`).digest("hex");
-const makeToken = user => Buffer.from(JSON.stringify({id:user.id,username:user.username,role:user.role,exp:Date.now()+1000*60*60*12})).toString("base64url")+"."+crypto.createHmac("sha256",SESSION_SECRET).update(`${user.id}:${user.username}:${user.role}`).digest("hex");
+const makeToken = user => Buffer.from(JSON.stringify({id:user.id,username:user.username,role:user.role,exp:Date.now()+1000*60*60*24*90})).toString("base64url")+"."+crypto.createHmac("sha256",SESSION_SECRET).update(`${user.id}:${user.username}:${user.role}`).digest("hex");
 const readToken = token => { try { const [payload,sig]=token.split("."); const u=JSON.parse(Buffer.from(payload,"base64url").toString()); const expected=crypto.createHmac("sha256",SESSION_SECRET).update(`${u.id}:${u.username}:${u.role}`).digest("hex"); if(!crypto.timingSafeEqual(Buffer.from(sig),Buffer.from(expected)) || u.exp<Date.now()) return null; return u; } catch { return null; } };
 const auth = (roles=[]) => (req,res,next) => { const token=req.headers.authorization?.replace(/^Bearer\s+/i,""); const user=token&&readToken(token); if(!user || (roles.length && !roles.includes(user.role))) return res.status(401).json({error:"Unauthorized"}); req.user=user; next(); };
 const staffRoles=["ceo","admin","division_manager","area_manager","tl","staff","telecaller","employee"];

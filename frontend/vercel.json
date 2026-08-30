@@ -8,6 +8,8 @@
     { "source": "/customer-register", "destination": "/customer-register.html" },
     { "source": "/register", "destination": "/customer-register.html" },
     { "source": "/api/pincode/:pin", "destination": "https://api.postalpincode.in/pincode/:pin" },
+    { "source": "/api/telangana/mandals", "destination": "https://tgrac.telangana.gov.in/arcgis/rest/services/RRR_Folder/RRR/MapServer/77/query" },
+    { "source": "/api/telangana/villages", "destination": "https://tgrac.telangana.gov.in/arcgis/rest/services/TIS_Folder/Tank_Information_System_Query/MapServer/2/query" },
     { "source": "/((?!api\\/.*|.*\\.html$).*)", "destination": "/index.html" }
   ]
 }

@@ -1,0 +1,61 @@
+/* NRORA: complete internal customer address + vehicle form. */
+(function(){
+  if(location.pathname!="/customers") return;
+  const districts=["Adilabad","Bhadradri Kothagudem","Hanamkonda","Hyderabad","Jagtial","Jangaon","Jayashankar Bhupalpally","Jogulamba Gadwal","Kamareddy","Karimnagar","Khammam","Komaram Bheem Asifabad","Mahabubabad","Mahabubnagar","Mancherial","Medak","Medchal-Malkajgiri","Mulugu","Nagarkurnool","Nalgonda","Narayanpet","Nirmal","Nizamabad","Peddapalli","Rajanna Sircilla","Rangareddy","Sangareddy","Siddipet","Suryapet","Vikarabad","Wanaparthy","Warangal","Yadadri Bhuvanagiri"];
+  const css=`<style id="nrora-customer-enhance-css">.nr-ce{display:grid;gap:12px}.nr-ce .sec{border:1px solid #d8e2f0;border-radius:14px;padding:14px;background:#f9fbff}.nr-ce .sec h3{margin:0 0 12px;font-size:15px;color:#14345d}.nr-ce .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.nr-ce label{display:grid;gap:5px;font-size:10px;font-weight:800;color:#4c6382}.nr-ce input,.nr-ce select{width:100%;box-sizing:border-box;padding:10px 11px;border:1px solid #cbd8e8;border-radius:9px;background:#fff;color:#152a45;font-size:13px}.nr-ce input[type=file]{padding:7px;font-size:11px}.nr-ce .full{grid-column:1/-1}.nr-ce .hint{font-size:11px;color:#70829b;font-weight:500}.nr-ce .preview{width:100%;max-height:150px;object-fit:contain;border:1px solid #d5dfed;border-radius:9px;margin-top:5px}.nr-ce .status{padding:10px;border-radius:9px;background:#eef6ff;color:#24558b;font-size:12px}.nr-ce .err{padding:10px;border-radius:9px;background:#fff0f0;color:#b42318;font-size:12px}.nr-ce button.primary{width:100%;border:0;border-radius:9px;padding:11px;background:#2167ee;color:#fff;font-weight:800;cursor:pointer}.nr-ce button.primary:disabled{opacity:.6;cursor:not-allowed}@media(max-width:700px){.nr-ce .grid{grid-template-columns:1fr}} </style>`;
+  const esc=s=>String(s??"").replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const fileData=file=>new Promise((resolve,reject)=>{if(!file)return resolve("");const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file)});
+  function build(form){
+    if(form.dataset.nroraCompleteForm) return;
+    form.dataset.nroraCompleteForm="1";
+    form.innerHTML=`<div class="nr-ce"><h2 style="margin:0">＋ Add Customer</h2><p class="muted">Complete customer address and vehicle information.</p>
+      <div class="sec"><h3>👤 Customer Details</h3><div class="grid">
+        <label>NAME<input id="nr-name" required placeholder="Customer name"></label>
+        <label>MOBILE NUMBER<input id="nr-phone" required inputmode="numeric" maxlength="10" pattern="[0-9]{10}" placeholder="10-digit mobile number"></label>
+      </div></div>
+      <div class="sec"><h3>🏠 Address</h3><div class="grid">
+        <label>HOUSE / DOOR NUMBER<input id="nr-house" placeholder="House / Door No."></label>
+        <label>LANDMARK<input id="nr-landmark" placeholder="Nearby landmark"></label>
+        <label>STATE<input id="nr-state" value="Telangana" readonly></label>
+        <label>DISTRICT<input id="nr-district" list="nr-districts" placeholder="Search / select district"><datalist id="nr-districts">${districts.map(x=>`<option value="${esc(x)}">`).join("")}</datalist></label>
+        <label>MANDAL<input id="nr-mandal" list="nr-mandals" placeholder="Search / enter mandal"><datalist id="nr-mandals"></datalist></label>
+        <label>VILLAGE<input id="nr-village" placeholder="Village"></label>
+        <label>PINCODE<input id="nr-pincode" required inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="6-digit pincode"></label>
+      </div></div>
+      <div class="sec"><h3>🚗 Vehicle Details</h3><div class="grid">
+        <label>1. REGISTRATION NUMBER<input id="nr-reg" required placeholder="TS09AB1234"></label>
+        <label>2. VEHICLE TYPE<select id="nr-type" required><option value="">Select type</option><option>Car</option><option>SUV</option><option>Hatchback</option><option>Sedan</option><option>MUV</option><option>Bike</option><option>Scooter</option><option>Auto</option><option>Commercial Vehicle</option><option>Truck</option><option>Bus</option><option>Other</option></select></label>
+        <label>3. MAKE / BRAND<input id="nr-brand" placeholder="Maruti, Hyundai, Tata, Honda..."></label>
+        <label>4. MODEL<input id="nr-model" placeholder="Vehicle model"></label>
+        <label>5. VARIANT<input id="nr-variant" placeholder="Variant"></label>
+        <label>6. MANUFACTURING YEAR<input id="nr-year" inputmode="numeric" maxlength="4" placeholder="YYYY"></label>
+        <label>6. COLOR<input id="nr-color" placeholder="Vehicle color"></label>
+        <label>7. RC NUMBER<input id="nr-rc" placeholder="RC number"></label>
+      </div></div>
+      <div class="sec"><h3>📷 Vehicle Documents</h3><div class="grid">
+        <label>BACK PHOTO<input id="nr-back" type="file" accept="image/*" capture="environment"></label>
+        <label>RC PHOTO<input id="nr-rcphoto" type="file" accept="image/*" capture="environment"></label>
+        <label class="full">OTHER DOCUMENT<input id="nr-other" type="file" accept="image/*,.pdf,.doc,.docx"></label>
+      </div></div>
+      <div id="nr-msg"></div><button class="primary" id="nr-save" type="submit">Save Customer</button></div>`;
+    form.addEventListener("submit",async e=>{
+      e.preventDefault();e.stopImmediatePropagation();
+      const g=id=>document.getElementById(id), msg=g("nr-msg"), btn=g("nr-save");
+      msg.innerHTML="";
+      if(!g("nr-name").value.trim()||!/^[0-9]{10}$/.test(g("nr-phone").value.trim())||!g("nr-reg").value.trim()||!/^[0-9]{6}$/.test(g("nr-pincode").value.trim())){msg.innerHTML='<div class="err">Please enter Name, valid 10-digit Mobile, Registration Number and 6-digit Pincode.</div>';return}
+      btn.disabled=true;btn.textContent="Saving…";
+      try{
+        const token=localStorage.getItem("nrora_token")||localStorage.getItem("nrora_ceo_token");
+        const headers={"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}:{})};
+        const base={name:g("nr-name").value.trim(),phone:g("nr-phone").value.trim(),address:[g("nr-house").value.trim(),g("nr-landmark").value.trim(),g("nr-district").value.trim(),g("nr-mandal").value.trim(),g("nr-village").value.trim(),g("nr-pincode").value.trim()].filter(Boolean).join(", "),vehicle_no:g("nr-reg").value.trim().toUpperCase()};
+        const r=await fetch("/api/customers",{method:"POST",headers,body:JSON.stringify(base)});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||"Unable to save customer");
+        const read=id=>fileData(g(id).files?.[0]);
+        const details={customer_id:data.id,house_number:g("nr-house").value.trim(),landmark:g("nr-landmark").value.trim(),state:"Telangana",district:g("nr-district").value.trim(),mandal:g("nr-mandal").value.trim(),village:g("nr-village").value.trim(),pincode:g("nr-pincode").value.trim(),registration_number:g("nr-reg").value.trim().toUpperCase(),vehicle_type:g("nr-type").value,make_brand:g("nr-brand").value.trim(),model:g("nr-model").value.trim(),variant:g("nr-variant").value.trim(),manufacturing_year:g("nr-year").value.trim(),color:g("nr-color").value.trim(),rc_number:g("nr-rc").value.trim(),back_photo:await read("nr-back"),rc_photo:await read("nr-rcphoto"),other_document:await read("nr-other")};
+        const d=await fetch("/api/customer-details",{method:"POST",headers,body:JSON.stringify(details)});const dd=await d.json().catch(()=>({}));if(!d.ok)throw new Error(dd.error||"Customer saved but vehicle details could not be saved");
+        msg.innerHTML='<div class="status">✓ Customer and complete vehicle details saved successfully.</div>';setTimeout(()=>location.reload(),700);
+      }catch(err){msg.innerHTML=`<div class="err">${esc(err.message)}</div>`;btn.disabled=false;btn.textContent="Save Customer"}
+    },true);
+  }
+  function find(){if(location.pathname!=="/customers")return;const f=document.querySelector("form.card.form");if(f&&!f.dataset.nroraCompleteForm)build(f)}
+  new MutationObserver(find).observe(document.documentElement,{subtree:true,childList:true});find();
+})();

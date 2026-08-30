@@ -44,6 +44,15 @@ async function ensurePermissionSchema(){await pool.query("create table if not ex
 const permissionAuth=permission=>(req,res,next)=>{const token=req.headers.authorization?.replace(/^Bearer\s+/i,"");const user=token&&readToken(token);if(!user)return res.status(401).json({error:"Unauthorized"});pool.query("select allowed from role_permissions where role=$1 and permission=$2",[user.role,permission]).then(r=>{if(!r.rowCount||!r.rows[0].allowed)return res.status(403).json({error:`Permission denied: ${permission}`});req.user=user;next()}).catch(next)};
 
 
+async function ensureCustomerSchema(){
+  const cols=[
+    ["house_number","text default ''"],["landmark","text default ''"],["state","varchar(80) default 'Telangana'"],["district","varchar(120) default ''"],["mandal","varchar(120) default ''"],["village","varchar(120) default ''"],["pincode","varchar(10) default ''"],["vehicle_type","varchar(80) default ''"],["make_brand","varchar(100) default ''"],["model","varchar(100) default ''"],["variant","varchar(100) default ''"],["manufacturing_year","varchar(10) default ''"],["color","varchar(60) default ''"],["rc_number","varchar(80) default ''"],["vehicle_photos","jsonb default '[]'::jsonb"],["account_status","varchar(30) default 'inactive'"],["mobile_verified","boolean default false"],["membership_start","date"],["membership_end","date"],["referral_code","varchar(40) default ''"],["referred_by","varchar(40) default ''"]
+  ];
+  for(const [name,type] of cols) await pool.query(`alter table customers add column if not exists ${name} ${type}`);
+  await pool.query("create index if not exists customers_phone_idx on customers(phone)");
+  await pool.query("create index if not exists customers_vehicle_idx on customers(vehicle_no)");
+}
+
 async function ensurePaymentSchema(){
   await pool.query("alter table payments add column if not exists status varchar(30) not null default 'pending'");
   await pool.query("alter table payments add column if not exists gateway_order_id varchar(120) default ''");
@@ -115,6 +124,11 @@ async function finalizeCapturedPayment({orderId,paymentId,amount,method="UPI",tr
   if(Number(amount) && Number(current.amount)!==Number(amount)) return null;
   const updated=await pool.query("update payments set status='captured',gateway_payment_id=$1,transaction_ref=$2,method=$3,paid_at=now() where id=$4 returning *",[paymentId,transactionRef,method,current.id]);
   const receipt=await makeReceipt(current.customer_id,current.id);
+  const active=await pool.query("select id from memberships where customer_id=$1 and renewal_date>=current_date order by renewal_date desc limit 1",[current.customer_id]);
+  if(!active.rowCount){
+    await pool.query("insert into memberships(customer_id,amount,renewal_date) values($1,4500,(current_date + interval '1 year')::date)",[current.customer_id]);
+  }
+  await pool.query("update customers set account_status='active',mobile_verified=true,membership_start=current_date,membership_end=(current_date + interval '1 year')::date where id=$1",[current.customer_id]);
   return {payment:updated.rows[0],receipt};
 }
 
@@ -141,7 +155,31 @@ app.patch("/api/employees/:id",permissionAuth("employees_manage"),asyncRoute(asy
 
 app.get("/api/dashboard", permissionAuth("dashboard_view"), asyncRoute(async (_req,res) => { const [customers,requests,technicians,payments]=await Promise.all([pool.query("select count(*)::int as count from customers"),pool.query("select count(*)::int as count from service_requests where status <> 'closed'"),pool.query("select count(*)::int as count from mechanics where active=true"),pool.query("select coalesce(sum(amount),0)::numeric as total from payments where status='captured'")]);res.json({customers:customers.rows[0].count,activeRequests:requests.rows[0].count,techniciansOnline:technicians.rows[0].count,revenue:Number(payments.rows[0].total)}); }));
 app.get("/api/customers",permissionAuth("customers_view"),asyncRoute(async(_req,res)=>{const r=await pool.query("select * from customers order by created_at desc");res.json(r.rows);}));
-app.post("/api/customers",permissionAuth("customers_create"),asyncRoute(async(req,res)=>{const {name,phone,address="",vehicle_no=""}=req.body;if(!name||!phone||!vehicle_no)return res.status(400).json({error:"name, phone and vehicle_no are required"});const r=await pool.query("insert into customers(name,phone,address,vehicle_no) values($1,$2,$3,$4) returning *",[name,phone,address,vehicle_no]);res.status(201).json(r.rows[0]);}));
+app.post("/api/customers",permissionAuth("customers_create"),asyncRoute(async(req,res)=>{
+  const {name,phone,address="",vehicle_no="",house_number="",landmark="",state="Telangana",district="",mandal="",village="",pincode="",vehicle_type="",make_brand="",model="",variant="",manufacturing_year="",color="",rc_number="",vehicle_photos=[],referral_code="",referred_by=""}=req.body;
+  if(!name||!phone||!vehicle_no)return res.status(400).json({error:"name, phone and vehicle_no are required"});
+  const r=await pool.query(`insert into customers(name,phone,address,vehicle_no,house_number,landmark,state,district,mandal,village,pincode,vehicle_type,make_brand,model,variant,manufacturing_year,color,rc_number,vehicle_photos,account_status,referral_code,referred_by) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'inactive',$20,$21) returning *`,[name,phone,address,vehicle_no,house_number,landmark,state,district,mandal,village,pincode,vehicle_type,make_brand,model,variant,manufacturing_year,color,rc_number,JSON.stringify(Array.isArray(vehicle_photos)?vehicle_photos:[]),referral_code,referred_by]);
+  res.status(201).json(r.rows[0]);
+}));
+
+app.post("/api/public/customer-register",asyncRoute(async(req,res)=>{
+  const {name,phone,address="",vehicle_no,house_number="",landmark="",state="Telangana",district="",mandal="",village="",pincode="",vehicle_type="",make_brand="",model="",variant="",manufacturing_year="",color="",rc_number="",referral_code=""}=req.body;
+  if(!name||!/^[0-9]{10}$/.test(String(phone||""))||!vehicle_no||!/^[0-9]{6}$/.test(String(pincode||""))) return res.status(400).json({error:"Name, valid 10-digit mobile, vehicle number and 6-digit PIN are required"});
+  const c=await pool.query(`insert into customers(name,phone,address,vehicle_no,house_number,landmark,state,district,mandal,village,pincode,vehicle_type,make_brand,model,variant,manufacturing_year,color,rc_number,account_status,referral_code) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'inactive',$19) returning id,name,phone,vehicle_no`,[name,phone,address,vehicle_no,house_number,landmark,state,district,mandal,village,pincode,vehicle_type,make_brand,model,variant,manufacturing_year,color,rc_number,referral_code]);
+  const customer=c.rows[0];
+  const order=await razorpayRequest("/orders","POST",{amount:MEMBERSHIP_AMOUNT*100,currency:"INR",receipt:`NRORA-P-${customer.id}-${Date.now()}`,payment_capture:1,notes:{customer_id:String(customer.id),customer_name:customer.name,vehicle_no:customer.vehicle_no}});
+  const payment=await pool.query("insert into payments(customer_id,amount,method,transaction_ref,status,gateway_order_id) values($1,$2,'UPI','',$3,$4) returning id",[customer.id,MEMBERSHIP_AMOUNT,"pending",order.id]);
+  res.status(201).json({customer,orderId:order.id,keyId:RAZORPAY_KEY_ID,amount:MEMBERSHIP_AMOUNT*100,currency:"INR",paymentId:payment.rows[0].id});
+}));
+
+app.post("/api/public/customer-register/verify",asyncRoute(async(req,res)=>{
+  const {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body;
+  if(!razorpay_order_id||!razorpay_payment_id||!razorpay_signature)return res.status(400).json({error:"Incomplete payment verification data"});
+  const q=await pool.query("select * from payments where gateway_order_id=$1 limit 1",[razorpay_order_id]); if(!q.rowCount)return res.status(404).json({error:"Payment order not found"});
+  const expected=crypto.createHmac("sha256",RAZORPAY_KEY_SECRET).update(`${razorpay_order_id}|${razorpay_payment_id}`).digest("hex"); if(!crypto.timingSafeEqual(Buffer.from(expected),Buffer.from(razorpay_signature)))return res.status(400).json({error:"Payment signature verification failed"});
+  const r=await razorpayRequest(`/payments/${encodeURIComponent(razorpay_payment_id)}`); if(r.status!=="captured")return res.status(409).json({error:`Payment is ${r.status}.`});
+  const done=await finalizeCapturedPayment({orderId:razorpay_order_id,paymentId:razorpay_payment_id,amount:Number(r.amount)/100,method:(r.method||"UPI").toUpperCase(),transactionRef:razorpay_payment_id}); if(!done)return res.status(409).json({error:"Payment could not be confirmed"}); res.json(done);
+}));
 app.delete("/api/customers/:id",permissionAuth("customers_delete"),asyncRoute(async(req,res)=>{await pool.query("delete from customers where id=$1",[req.params.id]);res.status(204).end();}));
 
 app.get("/api/requests",permissionAuth("requests_view"),asyncRoute(async(_req,res)=>{const r=await pool.query(`select sr.*, c.name customer_name, c.phone customer_phone, wo.id work_order_id, wo.status work_order_status, wo.mechanic_name work_order_mechanic from service_requests sr left join customers c on c.id=sr.customer_id left join work_orders wo on wo.request_id=sr.id order by sr.created_at desc`);res.json(r.rows);}));
@@ -205,4 +243,4 @@ app.get("/api/payments/status",auth(["ceo","admin","employee","staff","telecalle
 app.post("/api/payments",auth(["ceo","admin","employee","staff","telecaller"]),asyncRoute(async(req,res)=>res.status(410).json({error:"Manual payment confirmation is disabled. Use the secure payment gateway."})));
 app.post("/api/memberships/renew",auth(["ceo","admin","employee","staff","telecaller"]),asyncRoute(async(req,res)=>{const {customer_id,renewal_date}=req.body;if(!customer_id||!renewal_date)return res.status(400).json({error:"customer_id and renewal_date are required"});const r=await pool.query("insert into memberships(customer_id,amount,renewal_date) values($1,4500,$2) returning *",[customer_id,renewal_date]);res.status(201).json(r.rows[0]);}));
 app.use((err,_req,res,_next)=>{console.error(err);res.status(err.statusCode||500).json({error:err.message||"Internal server error"});});
-ensurePaymentSchema().then(ensureOperationsSchema).then(ensureAdmin).then(ensurePermissionSchema).then(()=>app.listen(port,()=>console.log(`NRORA API running on ${port}`))).catch(err=>{console.error("Startup failed",err);process.exit(1)});
+ensureCustomerSchema().then(ensurePaymentSchema).then(ensureOperationsSchema).then(ensureAdmin).then(ensurePermissionSchema).then(()=>app.listen(port,()=>console.log(`NRORA API running on ${port}`))).catch(err=>{console.error("Startup failed",err);process.exit(1)});

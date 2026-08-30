@@ -1,0 +1,54 @@
+name: Fix persistent sessions and customer delete
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Patch session duration and customer delete
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('backend/src/server.js')
+          s = p.read_text()
+          old = 'exp:Date.now()+1000*60*60*12'
+          new = 'exp:Date.now()+1000*60*60*24*90'
+          if old in s:
+              s = s.replace(old, new, 1)
+              print('Session lifetime changed from 12 hours to 90 days')
+          else:
+              print('Session lifetime pattern already patched')
+          p.write_text(s)
+
+          p = Path('frontend/src/App.jsx')
+          s = p.read_text()
+          old = 'api(`/customers?id=${encodeURIComponent(id)}`,{method:"DELETE"})'
+          new = 'api(`/customers/${encodeURIComponent(id)}`,{method:"DELETE"})'
+          if old in s:
+              s = s.replace(old, new, 1)
+              print('Customer delete route fixed')
+          else:
+              print('Customer delete route already patched')
+          p.write_text(s)
+          PY
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/src/server.js frontend/src/App.jsx
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "Fix persistent sessions and customer delete route [skip ci]"
+          git push

@@ -1,0 +1,61 @@
+name: Finalize NRORA customer UI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add customer grid styles
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('frontend/src/styles.css')
+          s=p.read_text()
+          css='''.grid-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid-form label{display:grid;gap:6px;font-size:10px;font-weight:800;color:#4c6382}.grid-form .full{grid-column:1/-1}.grid-form input,.grid-form select,.grid-form textarea{width:100%;box-sizing:border-box;padding:10px 11px;border:1px solid #cbd8e8;border-radius:9px;background:#fff;font:inherit}@media(max-width:700px){.grid-form{grid-template-columns:1fr}.grid-form .full{grid-column:auto}}\n'''
+          if '.grid-form{' not in s:
+              p.write_text(s+css)
+          PY
+      - name: Extend public registration API
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('frontend/api/customer-register.js')
+          s=p.read_text()
+          old='''const b=req.body||{},name=clean(b.name),phone=normalizePhone(b.phone),address=clean(b.address),vehicle=clean(b.vehicle_no).toUpperCase(),photos=Array.isArray(b.vehicle_photos)?b.vehicle_photos.slice(0,2):[];'''
+          new='''const b=req.body||{},name=clean(b.name),phone=normalizePhone(b.phone),address=clean(b.address),vehicle=clean(b.vehicle_no).toUpperCase(),photos=Array.isArray(b.vehicle_photos)?b.vehicle_photos.slice(0,2):[],email=clean(b.email),alternatePhone=normalizePhone(b.alternate_phone||""),profilePhoto=clean(b.profile_photo),referralCode=clean(b.referral_code).toUpperCase(),vehicleDetails=b.vehicle||{};'''
+          if old not in s: raise SystemExit('registration destructuring anchor not found')
+          s=s.replace(old,new)
+          old_insert='''update customers set name=$1,address=$2,vehicle_no=$3,vehicle_photos=$4,account_status='pending',mobile_verified=false where id=$5 returning *'''
+          new_insert='''update customers set name=$1,address=$2,vehicle_no=$3,vehicle_photos=$4,email=$5,alternate_phone=$6,profile_photo=$7,referral_code=$8,account_status='pending',mobile_verified=false where id=$9 returning *'''
+          old_args='''[name,address,vehicle,JSON.stringify(photos),existing.rows[0].id]'''
+          new_args='''[name,address,vehicle,JSON.stringify(photos),email,alternatePhone,profilePhoto,referralCode,existing.rows[0].id]'''
+          if old_insert not in s or old_args not in s: raise SystemExit('existing customer update anchor not found')
+          s=s.replace(old_insert,new_insert).replace(old_args,new_args)
+          old_new='''insert into customers(name,phone,address,vehicle_no,vehicle_photos,account_status,mobile_verified) values($1,$2,$3,$4,$5,'pending',false) returning *'''
+          new_new='''insert into customers(name,phone,address,vehicle_no,vehicle_photos,email,alternate_phone,profile_photo,referral_code,account_status,mobile_verified) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',false) returning *'''
+          old_new_args='''[name,phone,address,vehicle,JSON.stringify(photos)]'''
+          new_new_args='''[name,phone,address,vehicle,JSON.stringify(photos),email,alternatePhone,profilePhoto,referralCode]'''
+          if old_new not in s or old_new_args not in s: raise SystemExit('new customer insert anchor not found')
+          s=s.replace(old_new,new_new).replace(old_new_args,new_new_args)
+          marker='''const order=await razor("/orders","POST",{amount:AMOUNT*100,currency:"INR",receipt:`NRORA-SELF-${customer.id}-${Date.now()}`,payment_capture:1,notes:{customer_id:String(customer.id),customer_name:name,vehicle_no:vehicle}});'''
+          extra='''await pool.query("insert into customer_vehicles(customer_id,vehicle_no,vehicle_type,make_brand,model,variant,fuel_type,manufacturing_year,color,rc_number,photo1,photo2) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) on conflict do nothing",[customer.id,vehicle,String(vehicleDetails.vehicle_type||""),String(vehicleDetails.make_brand||""),String(vehicleDetails.model||""),String(vehicleDetails.variant||""),String(vehicleDetails.fuel_type||""),String(vehicleDetails.manufacturing_year||""),String(vehicleDetails.color||""),String(vehicleDetails.rc_number||""),photos[0]||"",photos[1]||""]);\nconst order=await razor("/orders","POST",{amount:AMOUNT*100,currency:"INR",receipt:`NRORA-SELF-${customer.id}-${Date.now()}`,payment_capture:1,notes:{customer_id:String(customer.id),customer_name:name,vehicle_no:vehicle}});'''
+          if marker not in s: raise SystemExit('order anchor not found')
+          s=s.replace(marker,extra)
+          p.write_text(s)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/src/styles.css frontend/api/customer-register.js
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Finalize customer UI and registration fields [skip ci]"
+          git push

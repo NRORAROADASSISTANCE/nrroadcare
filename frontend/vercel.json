@@ -7,6 +7,7 @@
     { "source": "/ceo.html", "destination": "/ceo.html" },
     { "source": "/customer-register", "destination": "/customer-register.html" },
     { "source": "/register", "destination": "/customer-register.html" },
+    { "source": "/api/pincode/:pin", "destination": "https://api.postalpincode.in/pincode/:pin" },
     { "source": "/((?!api\\/.*|.*\\.html$).*)", "destination": "/index.html" }
   ]
 }

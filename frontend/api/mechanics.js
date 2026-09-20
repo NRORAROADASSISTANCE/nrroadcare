@@ -28,7 +28,7 @@ async function schema(){
 }
 export default async function handler(req,res){
  res.setHeader("Access-Control-Allow-Origin","*");res.setHeader("Access-Control-Allow-Headers","Content-Type, Authorization");res.setHeader("Access-Control-Allow-Methods","GET,POST,PATCH,DELETE,OPTIONS");if(req.method==="OPTIONS")return res.status(204).end();
- try{await schema();const roles=["admin","division_manager","area_manager"];const u=auth(req,res,roles);if(!u)return;
+ try{await schema();const roles=["ceo","admin","division_manager","area_manager"];const u=auth(req,res,roles);if(!u)return;
  if(req.method==="GET"){const r=await pool.query("select id,name,garage_name,phone,alternate_phone,address,specialization,active,id_number,licence_no,vehicle_type,vehicle_no,experience_years,service_area,joining_date,username,profile_photo,documents,undertaking,signature_data,created_at from technicians order by created_at desc");return json(res,200,r.rows)}
  if(req.method==="POST"){
   const b=req.body||{};if(!b.name||!b.phone||!b.username||!b.password)return json(res,400,{error:"name, phone, username and password are required"});

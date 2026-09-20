@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from "react";
+import CustomerDetailsOverlay from "./CustomerDetailsOverlayFixed.jsx";
 
 const API="/api";
 const getToken=()=>localStorage.getItem("nrora_ceo_token")||localStorage.getItem("nrora_token")||"";

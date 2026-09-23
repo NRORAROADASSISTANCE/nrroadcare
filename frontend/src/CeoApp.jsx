@@ -3,7 +3,7 @@ import CustomerDetailsOverlay from "./CustomerDetailsOverlayFixed.jsx";
 
 const API="/api";
 const getToken=()=>localStorage.getItem("nrora_ceo_token")||localStorage.getItem("nrora_token")||"";
-const api=async(path,options={})=>{const headers={"Content-Type":"application/json",...(options.headers||{})};const t=getToken();if(t)headers.Authorization=`Bearer ${t}`;const r=await fetch(API+path,{...options,headers});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.error||`Request failed (${r.status})`);return d};
+const api=async(path,options={})=>{const headers={"Content-Type":"application/json",...(options.headers||{})};const t=getToken();if(t)headers.Authorization=`Bearer ${t}`;const [p,q]=path.split("?");const r=await fetch(API+"/_router?path="+encodeURIComponent(p.replace(/^\//,""))+(q?"&"+q:""),{...options,headers});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.error||`Request failed (${r.status})`);return d};
 const roles=["admin","division_manager","area_manager","tl","staff","telecaller","mechanic"];
 const labels={admin:"Admin",division_manager:"Division Manager",area_manager:"Area Manager",tl:"Team Leader (TL)",staff:"Staff",telecaller:"Telecaller",mechanic:"Mechanic"};
 const permissionGroups=[

@@ -67,6 +67,24 @@ const ceo=await pool.query("select id from users where username=$1",[CEO_USERNAM
 const r=await pool.query("select id from users where username=$1",[ADMIN_USERNAME]);if(!r.rowCount)await pool.query("insert into users(username,password_hash,role,name) values($1,$2,'admin',$3)",[ADMIN_USERNAME,hash(ADMIN_PASSWORD),"NRORA Admin"]);
 const defaults={company_name:"NRORA Road Assistance",phone:"9160264439",website:"nrroadcare.in",service_network:"Telangana",address:"Mugpal Village, Mugpal Mandal, Nizamabad District, Telangana 503230",upi_id:"9000264439-4@ybl",membership_amount:"4500",renewal_period:"Annual",customer_verification:"Registered mobile + registered vehicle number required",work_order:"Mechanic assignment and work-order workflow enabled"};for(const [k,v] of Object.entries(defaults))await pool.query("insert into nrora_settings(key,value) values($1,$2) on conflict(key) do nothing",[k,v]);}
 export default async function handler(req,res){res.setHeader("Access-Control-Allow-Origin","*");res.setHeader("Access-Control-Allow-Headers","Content-Type, Authorization");res.setHeader("Access-Control-Allow-Methods","GET,POST,PATCH,DELETE,OPTIONS");if(req.method==="OPTIONS")return res.status(204).end();try{await schema();let path=req.query?.path;if(Array.isArray(path))path=path.join("/");else path=String(path||"");path=path.replace(/^\/+|\/+$/g,"");const parts=path.split("/").filter(Boolean),id=parts[1];
+const mutationPaths=["customers","requests","technicians","employees","ceo/admins","ceo/settings","permissions","memberships/renew"];
+if(req.method==="PATCH"&&mutationPaths.some(p=>path===p||path.startsWith(p+"/"))&&!path.startsWith("ceo/change-requests")&&!path.startsWith("customer-update-requests")){
+  const u=userFrom(req);
+  if(!u)return json(res,401,{error:"Unauthorized"});
+  if(u.role!=="ceo"){
+    const entityType=path.split("/")[0]||path;
+    const r=await pool.query("insert into change_requests(requested_by,requested_by_username,requested_by_role,action,entity_type,entity_id,changes) values($1,$2,$3,$4,$5,$6,$7) returning id,status,created_at",[u.id,u.username,u.role,"modify",entityType,id||null,JSON.stringify({path,body:req.body||{}})]);
+    return json(res,202,{pending:true,message:"Modification is pending CEO approval.",request:r.rows[0]});
+  }
+}
+if(req.method==="DELETE"&&path.startsWith("customers/")){
+  const u=userFrom(req);
+  if(!u)return json(res,401,{error:"Unauthorized"});
+  if(u.role!=="ceo"){
+    const r=await pool.query("insert into change_requests(requested_by,requested_by_username,requested_by_role,action,entity_type,entity_id,changes) values($1,$2,$3,'delete','customer',$4,$5) returning id,status,created_at",[u.id,u.username,u.role,id,JSON.stringify({path})]);
+    return json(res,202,{pending:true,message:"Deletion is pending CEO approval.",request:r.rows[0]});
+  }
+}
 if(req.method==="GET"&&path==="health")return json(res,200,{ok:true,service:"nrroadcare-api",time:new Date().toISOString()});
 if(req.method==="POST"&&path==="auth/login"){const{username,password}=req.body||{};if(!username||!password)return json(res,400,{error:"Username and password are required"});const r=await pool.query("select * from users where username=$1 and active=true",[username]);const u=r.rows[0];if(u&&u.password_hash===hash(password))return json(res,200,{token:token(u),user:{id:u.id,username:u.username,role:u.role,name:u.name,phone:u.phone}});const m=await pool.query("select id,name,phone,username,password_hash,active from technicians where username=$1 and active=true",[username]);const mech=m.rows[0];if(mech&&mech.password_hash===hash(password))return json(res,200,{token:token({id:mech.id,username:mech.username,role:"mechanic",name:mech.name,phone:mech.phone}),user:{id:mech.id,username:mech.username,role:"mechanic",name:mech.name,phone:mech.phone}});return json(res,401,{error:"Invalid username or password"})}
 if(req.method==="GET"&&path==="auth/me"){const u=requireAuth(req,res);if(!u)return;return json(res,200,{user:u})}

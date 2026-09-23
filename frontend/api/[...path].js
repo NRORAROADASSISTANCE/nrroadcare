@@ -3,6 +3,35 @@ import crypto from "crypto";
 const { Pool } = pg;
 const pool = globalThis.__nroraPool || new Pool({ connectionString: process.env.DATABASE_URL, max: 5, idleTimeoutMillis: 10000 });
 globalThis.__nroraPool = pool;
+
+let __nroraSafetyReady=null;
+const ensureDataSafety=async()=>{
+  if(__nroraSafetyReady)return __nroraSafetyReady;
+  __nroraSafetyReady=(async()=>{
+    await pool.query(`create table if not exists nrora_data_versions(
+      version_id bigserial primary key,
+      table_name text not null,
+      row_id text,
+      operation text not null,
+      row_data jsonb,
+      changed_at timestamptz not null default now()
+    )`);
+    await pool.query(`create or replace function nrora_capture_old_row() returns trigger language plpgsql as $
+      begin
+        if (tg_op in ('UPDATE','DELETE')) then
+          insert into nrora_data_versions(table_name,row_id,operation,row_data)
+          values (tg_table_name,coalesce((to_jsonb(old)->>'id'),'unknown'),tg_op,to_jsonb(old));
+        end if;
+        return coalesce(new,old);
+      end;
+    $`);
+    for (const table of ["customers","technicians","service_requests","payments","memberships","receipts","users","payment_settings"]) {
+      await pool.query(`drop trigger if exists nrora_safety_${table} on ${table}`);
+      await pool.query(`create trigger nrora_safety_${table} before update or delete on ${table} for each row execute function nrora_capture_old_row()`);
+    }
+  })().catch(e=>{__nroraSafetyReady=null;throw e});
+  return __nroraSafetyReady;
+};
 const SECRET = process.env.SESSION_SECRET || "change-this-session-secret-in-vercel";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "NRORA@123";

@@ -44,6 +44,46 @@
     {
       "source": "/((?!api\\/.*|.*\\.html$).*)",
       "destination": "/index.html"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/mechanics?route=health"
+    },
+    {
+      "source": "/api/dashboard",
+      "destination": "/api/mechanics?route=dashboard"
+    },
+    {
+      "source": "/api/self-portal",
+      "destination": "/api/mechanics?route=self-portal"
+    },
+    {
+      "source": "/api/activity",
+      "destination": "/api/mechanics?route=activity"
+    },
+    {
+      "source": "/api/change-requests",
+      "destination": "/api/mechanics?route=change-requests"
+    },
+    {
+      "source": "/api/customers",
+      "destination": "/api/mechanics?route=customers"
+    },
+    {
+      "source": "/api/customer-update-requests",
+      "destination": "/api/mechanics?route=customer-update-requests"
+    },
+    {
+      "source": "/api/requests",
+      "destination": "/api/mechanics?route=requests"
+    },
+    {
+      "source": "/api/technicians",
+      "destination": "/api/mechanics?route=technicians"
+    },
+    {
+      "source": "/api/employees",
+      "destination": "/api/mechanics?route=employees"
     }
   ]
 }

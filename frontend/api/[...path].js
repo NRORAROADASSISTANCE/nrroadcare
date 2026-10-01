@@ -56,6 +56,15 @@ async function recordLoginFailure(username,req){const h=ipHash(req);await pool.q
 async function recordLoginSuccess(username,req,role){const h=ipHash(req);await pool.query("delete from nrora_login_attempts where username=$1 and ip_hash=$2",[username,h]);await pool.query("insert into nrora_auth_events(username,event,ip_hash,details) values($1,'login_success',$2,$3)",[username,h,JSON.stringify({role})])}
 async function ensureAuditSchema(){
  await pool.query(`create table if not exists nrora_audit_logs(id bigserial primary key,actor_id bigint,actor_username varchar(80),actor_role varchar(30),action varchar(80) not null,entity_type varchar(50) not null,entity_id text,details jsonb not null default '{}'::jsonb,created_at timestamptz not null default now())`);
+ await pool.query(`create or replace function nrora_block_audit_mutation() returns trigger language plpgsql as $
+begin
+  raise exception 'Audit logs are immutable';
+end;
+$`);
+ await pool.query("drop trigger if exists nrora_audit_no_update on nrora_audit_logs");
+ await pool.query("drop trigger if exists nrora_audit_no_delete on nrora_audit_logs");
+ await pool.query("create trigger nrora_audit_no_update before update on nrora_audit_logs for each row execute function nrora_block_audit_mutation()");
+ await pool.query("create trigger nrora_audit_no_delete before delete on nrora_audit_logs for each row execute function nrora_block_audit_mutation()");
  await pool.query("alter table customers add column if not exists created_by bigint");
  await pool.query("alter table customers add column if not exists created_by_username varchar(80)");
  await pool.query("alter table customers add column if not exists created_by_role varchar(30)");

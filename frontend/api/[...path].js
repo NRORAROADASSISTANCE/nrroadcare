@@ -168,7 +168,7 @@ if(req.method==="DELETE"&&path.startsWith("customers/")){
   await cancelPendingForCeo("customer",customerId,u.id);
   const removed=await pool.query("delete from customers where id=$1 returning id");
   if(!removed.rowCount)return json(res,404,{error:"Customer not found"});
-  await audit(u,"customer_removed","customer",customerId,{name:snapshot.name,phone:snapshot.phone,vehicle_no:snapshot.vehicle_no,account_status:snapshot.account_status});
+  await auditDataChange(u,"customer_removed","customer",customerId,snapshot,null,{account_status:snapshot.account_status});
   return json(res,200,{ok:true,pending:false});
 }
 if(req.method==="GET"&&path==="health")return json(res,200,{ok:true,service:"nrroadcare-api",time:new Date().toISOString()});
@@ -352,10 +352,13 @@ if(req.method==="PATCH"&&parts[0]==="customer-update-requests"&&id){
         const dup=await pool.query("select id from customers where phone=$1 and id<>$2",[String(ch.phone),reqr.customer_id]);
         if(dup.rowCount)return json(res,409,{error:"Mobile number already belongs to another customer"});
       }
+      const before=await pool.query("select * from customers where id=$1",[reqr.customer_id]);
+      if(!before.rowCount)return json(res,409,{error:"Customer no longer exists"});
       const vals=fields.map(k=>ch[k]);
       const sets=fields.map((k,i)=>k+"=$"+(i+1)).join(",");
-      const updated=await pool.query("update customers set "+sets+" where id=$"+(fields.length+1)+" returning id",[...vals,reqr.customer_id]);
+      const updated=await pool.query("update customers set "+sets+" where id=$"+(fields.length+1)+" returning *",[...vals,reqr.customer_id]);
       if(!updated.rowCount)return json(res,409,{error:"Customer could not be updated"});
+      await auditDataChange(u,"customer_updated","customer",reqr.customer_id,before.rows[0],updated.rows[0],{request_id:id});
     }
   }
   const out=await pool.query("update customer_update_requests set status=$1,reviewed_by=$2,reviewed_at=now() where id=$3 and status='pending' returning *",[status,u.id,id]);

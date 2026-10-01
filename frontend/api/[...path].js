@@ -314,7 +314,24 @@ if(req.method==="PATCH"&&parts[0]==="employees"&&id){
   await auditDataChange(u,"employee_modified","user",id,target.rows[0],r.rows[0],{changes:Object.keys(b).filter(k=>k!=="password")});
   return json(res,200,r.rows[0]);
 }
-if(req.method==="GET"&&path==="ceo/audit-logs"){if(!requireAuth(req,res,["ceo"]))return;const r=await pool.query("select * from nrora_audit_logs order by created_at desc limit 500");return json(res,200,r.rows)}
+if(req.method==="GET"&&path==="ceo/audit-logs"){
+  const u=requireAuth(req,res,["ceo"]);if(!u)return;
+  const rawLimit=Number(req.query?.limit||100),rawOffset=Number(req.query?.offset||0);
+  const limit=Number.isInteger(rawLimit)?Math.min(Math.max(rawLimit,1),100):100;
+  const offset=Number.isInteger(rawOffset)?Math.min(Math.max(rawOffset,0),100000):0;
+  const action=String(req.query?.action||"").trim().slice(0,80);
+  const entityType=String(req.query?.entity_type||"").trim().slice(0,50);
+  const actorUsername=String(req.query?.actor_username||"").trim().slice(0,80);
+  const conditions=[],values=[];
+  if(action){values.push(action);conditions.push("action=$"+values.length)}
+  if(entityType){values.push(entityType);conditions.push("entity_type=$"+values.length)}
+  if(actorUsername){values.push(actorUsername);conditions.push("lower(actor_username)=lower($"+values.length+")")}
+  values.push(limit);const limitPos=values.length;
+  values.push(offset);const offsetPos=values.length;
+  const where=conditions.length?" where "+conditions.join(" and "):"";
+  const r=await pool.query("select * from nrora_audit_logs"+where+" order by created_at desc,id desc limit $"+limitPos+" offset $"+offsetPos,values);
+  return json(res,200,{rows:r.rows,pagination:{limit,offset,count:r.rowCount,has_more:r.rowCount===limit},filters:{action,entity_type:entityType,actor_username:actorUsername}});
+}
 if(req.method==="DELETE"&&parts[0]==="requests"&&id){const u=requireAuth(req,res,["ceo"]);if(!u)return;await cancelPendingForCeo("requests",id,u.id);const r=await pool.query("delete from service_requests where id=$1 returning id",[id]);if(!r.rowCount)return json(res,404,{error:"Request not found"});await audit(u,"request_removed","service_request",id,{});return json(res,200,{ok:true,pending:false})}
 if(req.method==="PATCH"&&parts[0]==="payments"&&id&&path.endsWith("/void")){const u=requireAuth(req,res,["ceo"]);if(!u)return;const r=await pool.query("update payments set status='void' where id=$1 returning *",[id]);if(!r.rowCount)return json(res,404,{error:"Payment not found"});await audit(u,"payment_voided","payment",id,{});return json(res,200,{ok:true,payment:r.rows[0]})}
 if(req.method==="GET"&&path==="mechanic-orders"){const u=requireAuth(req,res,["mechanic"]);if(!u)return;const r=await pool.query("select mo.id,mo.request_id,mo.technician_id,mo.technician_name,mo.status,mo.created_at,mo.accepted_at,mo.started_at,mo.completed_at,sr.location,sr.description,c.name customer_name,c.phone customer_phone,c.vehicle_no from mechanic_orders mo join service_requests sr on sr.id=mo.request_id left join customers c on c.id=sr.customer_id where mo.technician_id=$1 order by mo.created_at desc",[u.id]);return json(res,200,r.rows)}

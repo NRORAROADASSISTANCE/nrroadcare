@@ -167,7 +167,18 @@ if(req.method==="PATCH"&&parts[0]==="ceo"&&parts[1]==="change-requests"&&parts[2
   const removed=await pool.query("delete from customers where id=$1 returning id",[customerId]);
   if(!removed.rowCount)return json(res,404,{error:"Customer could not be deleted"});
   await audit(u,"customer_removed","customer",customerId,{name:snapshot.name,phone:snapshot.phone,vehicle_no:snapshot.vehicle_no,account_status:snapshot.account_status,approved_request_id:cr.id});
-}else if(cr.action==="modify"&&p==="customers/"+cr.entity_id){const fs=["name","phone","address","vehicle_no"].filter(k=>Object.hasOwn(b,k));if(fs.length){const vs=fs.map(k=>b[k]);await pool.query("update customers set "+fs.map((k,i)=>k+"=$"+(i+1)).join(",")+" where id=$"+(fs.length+1),[...vs,cr.entity_id])}}else if(cr.action==="delete"&&cr.entity_type==="technician"){await pool.query("update technicians set active=false where id=$1",[cr.entity_id])}else if(cr.action==="delete"&&cr.entity_type==="employee"){await pool.query("update users set active=false where id=$1 and role not in ('ceo','admin')",[cr.entity_id])}else if(cr.action==="modify"&&p==="employees/"+cr.entity_id){
+}else if(cr.action==="modify"&&p==="customers/"+cr.entity_id){const fs=["name","phone","address","vehicle_no"].filter(k=>Object.hasOwn(b,k));if(fs.length){const vs=fs.map(k=>b[k]);await pool.query("update customers set "+fs.map((k,i)=>k+"=$"+(i+1)).join(",")+" where id=$"+(fs.length+1),[...vs,cr.entity_id])} }else if(cr.action==="delete"&&cr.entity_type==="technician"){
+  const target=await pool.query("select id,active from technicians where id=$1",[cr.entity_id]);
+  if(!target.rowCount)return json(res,404,{error:"Technician not found"});
+  const removed=await pool.query("update technicians set active=false where id=$1 returning id",[cr.entity_id]);
+  if(!removed.rowCount)return json(res,409,{error:"Technician could not be deactivated"});
+else if(cr.action==="delete"&&cr.entity_type==="employee"){
+  const target=await pool.query("select id,role from users where id=$1",[cr.entity_id]);
+  if(!target.rowCount)return json(res,404,{error:"Employee not found"});
+  if(["ceo","admin"].includes(target.rows[0].role))return json(res,403,{error:"Protected account cannot be deactivated"});
+  const removed=await pool.query("update users set active=false where id=$1 and role not in ('ceo','admin') returning id",[cr.entity_id]);
+  if(!removed.rowCount)return json(res,409,{error:"Employee could not be deactivated"});
+}else if(cr.action==="modify"&&p==="employees/"+cr.entity_id){
   const fs=["name","phone","role","position","salary"].filter(k=>Object.hasOwn(b,k));
   if(fs.length){
     if(Object.hasOwn(b,"role")&&!["division_manager","area_manager","tl","staff","telecaller","mechanic"].includes(String(b.role)))return json(res,400,{error:"Invalid employee role"});

@@ -314,6 +314,21 @@ if(req.method==="PATCH"&&parts[0]==="employees"&&id){
   await auditDataChange(u,"employee_modified","user",id,target.rows[0],r.rows[0],{changes:Object.keys(b).filter(k=>k!=="password")});
   return json(res,200,r.rows[0]);
 }
+if(req.method==="GET"&&path==="ceo/security-events"){
+  const u=requireAuth(req,res,["ceo"]);if(!u)return;
+  const rawLimit=Number(req.query?.limit||100),rawOffset=Number(req.query?.offset||0);
+  const limit=Number.isInteger(rawLimit)?Math.min(Math.max(rawLimit,1),100):100;
+  const offset=Number.isInteger(rawOffset)?Math.min(Math.max(rawOffset,0),100000):0;
+  const event=String(req.query?.event||"").trim().slice(0,30);
+  const username=String(req.query?.username||"").trim().slice(0,80);
+  const conditions=[],values=[];
+  if(event){values.push(event);conditions.push("event=$"+values.length)}
+  if(username){values.push(username);conditions.push("lower(username)=lower($"+values.length))}
+  values.push(limit);const lp=values.length;values.push(offset);const op=values.length;
+  const where=conditions.length?" where "+conditions.join(" and "):"";
+  const r=await pool.query("select id,username,event,created_at,details from nrora_auth_events"+where+" order by created_at desc,id desc limit $"+lp+" offset $"+op,values);
+  return json(res,200,{rows:r.rows,pagination:{limit,offset,count:r.rowCount,has_more:r.rowCount===limit},filters:{event,username}});
+}
 if(req.method==="GET"&&path==="ceo/audit-logs"){
   const u=requireAuth(req,res,["ceo"]);if(!u)return;
   const rawLimit=Number(req.query?.limit||100),rawOffset=Number(req.query?.offset||0);

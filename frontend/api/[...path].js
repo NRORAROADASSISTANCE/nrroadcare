@@ -134,14 +134,22 @@ if(req.method==="DELETE"&&path.startsWith("employees/")){
 if(req.method==="DELETE"&&path.startsWith("customers/")){
   const u=userFrom(req);
   if(!u)return json(res,401,{error:"Unauthorized"});
+  const customerId=Number(id);
+  if(!Number.isInteger(customerId)||customerId<=0)return json(res,400,{error:"Valid customer id is required"});
+  const customer=await pool.query("select id,name,phone,vehicle_no,account_status from customers where id=$1",[customerId]);
+  if(!customer.rowCount)return json(res,404,{error:"Customer not found"});
+  const snapshot=customer.rows[0];
   if(u.role!=="ceo"){
-    const r=await pool.query("insert into change_requests(requested_by,requested_by_username,requested_by_role,action,entity_type,entity_id,changes) values($1,$2,$3,'delete','customer',$4,$5) returning id,status,created_at",[u.id,u.username,u.role,id,JSON.stringify({path})]);
+    const existing=await pool.query("select id,status from change_requests where status='pending' and action='delete' and entity_type='customer' and entity_id=$1 and requested_by=$2 order by created_at desc limit 1",[customerId,u.id]);
+    if(existing.rowCount)return json(res,202,{pending:true,message:"Deletion is already pending CEO approval.",request:existing.rows[0]});
+    const r=await pool.query("insert into change_requests(requested_by,requested_by_username,requested_by_role,action,entity_type,entity_id,changes) values($1,$2,$3,'delete','customer',$4,$5) returning id,status,created_at",[u.id,u.username,u.role,customerId,JSON.stringify({path,customer:snapshot})]);
+    await audit(u,"customer_delete_requested","customer",customerId,{name:snapshot.name,phone:snapshot.phone,vehicle_no:snapshot.vehicle_no});
     return json(res,202,{pending:true,message:"Deletion is pending CEO approval.",request:r.rows[0]});
   }
-  await cancelPendingForCeo("customer",id,u.id);
+  await cancelPendingForCeo("customer",customerId,u.id);
   const removed=await pool.query("delete from customers where id=$1 returning id");
   if(!removed.rowCount)return json(res,404,{error:"Customer not found"});
-  await audit(u,"customer_removed","customer",id,{});
+  await audit(u,"customer_removed","customer",customerId,{name:snapshot.name,phone:snapshot.phone,vehicle_no:snapshot.vehicle_no,account_status:snapshot.account_status});
   return json(res,200,{ok:true,pending:false});
 }
 if(req.method==="GET"&&path==="health")return json(res,200,{ok:true,service:"nrroadcare-api",time:new Date().toISOString()});

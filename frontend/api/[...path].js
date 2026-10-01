@@ -401,18 +401,30 @@ if(req.method==="POST"&&path==="memberships/renew"){
   const u=requireAuth(req,res,["ceo","admin","division_manager","area_manager","tl","staff"]);if(!u)return;
   const{customer_id,renewal_date,payment_id}=req.body||{};
   const customerId=Number(customer_id), paymentId=Number(payment_id);
-  if(!Number.isInteger(customerId)||customerId<=0||!Number.isInteger(paymentId)||paymentId<=0||!/^\d{4}-\d{2}-\d{2}$/.test(String(renewal_date||"")))return json(res,400,{error:"Valid customer_id, payment_id and renewal_date are required"});
-  const customer=await pool.query("select id,account_status from customers where id=$1",[customerId]);
-  if(!customer.rowCount)return json(res,404,{error:"Customer not found"});
-  const payment=await pool.query("select id,customer_id,amount,status from payments where id=$1",[paymentId]);
-  if(!payment.rowCount)return json(res,404,{error:"Payment not found"});
-  const p=payment.rows[0];
-  if(Number(p.customer_id)!==customerId||Number(p.amount)!==4500||p.status!=="captured")return json(res,400,{error:"Payment is not valid for this membership"});
-  const duplicate=await pool.query("select id from memberships where customer_id=$1 and renewal_date=$2",[customerId,renewal_date]);
-  if(duplicate.rowCount)return json(res,409,{error:"Membership for this renewal date already exists"});
-  const r=await pool.query("insert into memberships(customer_id,amount,renewal_date) values($1,4500,$2) returning *",[customerId,renewal_date]);
-  await pool.query("update customers set account_status='active' where id=$1",[customerId]);
-  await audit(u,"membership_renewed","membership",r.rows[0].id,{customer_id:customerId,amount:4500,renewal_date,payment_id:paymentId});
-  return json(res,201,r.rows[0]);
+  if(!Number.isInteger(customerId)||customerId<=0||!Number.isInteger(paymentId)||paymentId<=0||!/^d{4}-d{2}-d{2}$/.test(String(renewal_date||"")))return json(res,400,{error:"Valid customer_id, payment_id and renewal_date are required"});
+  const db=await pool.connect();
+  try{
+    await db.query("begin");
+    const customer=await db.query("select id,account_status from customers where id=$1 for update",[customerId]);
+    if(!customer.rowCount){await db.query("rollback");return json(res,404,{error:"Customer not found"});}
+    const payment=await db.query("select id,customer_id,amount,status from payments where id=$1 for update",[paymentId]);
+    if(!payment.rowCount){await db.query("rollback");return json(res,404,{error:"Payment not found"});}
+    const p=payment.rows[0];
+    if(Number(p.customer_id)!==customerId||Number(p.amount)!==4500||p.status!=="captured"){await db.query("rollback");return json(res,400,{error:"Payment is not valid for this membership"});}
+    const duplicate=await db.query("select id from memberships where customer_id=$1 and renewal_date=$2 for update",[customerId,renewal_date]);
+    if(duplicate.rowCount){await db.query("rollback");return json(res,409,{error:"Membership for this renewal date already exists"});}
+    const used=await db.query("select id from memberships where customer_id=$1 and payment_id=$2 limit 1",[customerId,paymentId]);
+    if(used.rowCount){await db.query("rollback");return json(res,409,{error:"This payment has already been used for a membership"});}
+    const r=await db.query("insert into memberships(customer_id,amount,renewal_date,payment_id) values($1,4500,$2,$3) returning *",[customerId,renewal_date,paymentId]);
+    await db.query("update customers set account_status='active' where id=$1",[customerId]);
+    await db.query("commit");
+    await audit(u,"membership_renewed","membership",r.rows[0].id,{customer_id:customerId,amount:4500,renewal_date,payment_id:paymentId});
+    return json(res,201,r.rows[0]);
+  }catch(e){
+    try{await db.query("rollback")}catch{}
+    if(e?.code==="42703")return json(res,500,{error:"Membership payment linkage is not available yet"});
+    if(e?.code==="23505")return json(res,409,{error:"This membership or payment is already linked"});
+    throw e;
+  }finally{db.release()}
 }
 return json(res,404,{error:"Not found"})}catch(e){console.error(e);return json(res,500,{error:e?.message||"Internal server error"})}}

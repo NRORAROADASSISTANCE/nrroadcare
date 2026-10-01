@@ -313,7 +313,37 @@ if(req.method==="GET"&&path==="customers"){if(!requireAuth(req,res,["ceo","admin
 if(req.method==="POST"&&path==="customers"){const u=requireAuth(req,res,["ceo","admin","division_manager","area_manager","tl","staff"]);if(!u)return;const{name,phone,address="",vehicle_no,vehicle_photos=[]}=req.body||{};if(!name||!phone||!vehicle_no)return json(res,400,{error:"Name, mobile number and vehicle number are required"});const mobile=String(phone).replace(/\D/g,"");if(mobile.length!==10)return json(res,400,{error:"Enter a valid 10-digit mobile number"});const exists=await pool.query("select id from customers where phone=$1",[phone]);if(exists.rowCount)return json(res,409,{error:"A customer account already exists for this mobile number"});const r=await pool.query("insert into customers(name,phone,address,vehicle_no,mobile_verified,account_status,vehicle_photos,created_by,created_by_username,created_by_role) values($1,$2,$3,$4,false,'inactive',$5,$6,$7,$8) returning *",[name,phone,address,vehicle_no,JSON.stringify(Array.isArray(vehicle_photos)?vehicle_photos.slice(0,5):[]),u.id,u.username,u.role]);await audit(u,"customer_created","customer",r.rows[0].id,{name,phone,vehicle_no,address});return json(res,201,{ok:true,customer:r.rows[0],message:"Customer saved. Membership will activate after successful payment and bank/gateway verification."})}
 if(req.method==="POST"&&path==="customer-update-requests"){const u=requireAuth(req,res,["staff","tl","area_manager","division_manager"]);if(!u)return;const{customer_id,changes}=req.body||{};const cid=Number(customer_id);if(!Number.isInteger(cid)||cid<=0||!changes||typeof changes!=="object"||Array.isArray(changes))return json(res,400,{error:"Valid customer_id and change data are required"});const c=await pool.query("select id from customers where id=$1",[cid]);if(!c.rowCount)return json(res,404,{error:"Customer not found"});const allowed=["name","phone","address","vehicle_no"];const fields=Object.keys(changes);if(!fields.length||fields.some(k=>!allowed.includes(k)))return json(res,400,{error:"Only name, phone, address and vehicle number can be changed"});if(JSON.stringify(changes).length>5000)return json(res,400,{error:"Change request is too large"});if(Object.hasOwn(changes,"phone")){const phone=String(changes.phone).replace(/\D/g,"");if(phone.length!==10)return json(res,400,{error:"Enter a valid 10-digit mobile number"});const dup=await pool.query("select id from customers where phone=$1 and id<>$2",[String(changes.phone),cid]);if(dup.rowCount)return json(res,409,{error:"Mobile number already belongs to another customer"})}const r=await pool.query("insert into customer_update_requests(customer_id,requested_by,changes) values($1,$2,$3) returning *",[cid,u.id,JSON.stringify(changes)]);return json(res,201,r.rows[0])}
 if(req.method==="GET"&&path==="customer-update-requests"){if(!requireAuth(req,res,["ceo"]))return;const r=await pool.query("select r.*,c.name customer_name,u.name requested_by_name from customer_update_requests r join customers c on c.id=r.customer_id left join users u on u.id=r.requested_by where r.status='pending' order by r.created_at");return json(res,200,r.rows)}
-if(req.method==="PATCH"&&parts[0]==="customer-update-requests"&&id){const u=requireAuth(req,res,["ceo"]);if(!u)return;const{status}=req.body||{};if(!["approved","rejected"].includes(status))return json(res,400,{error:"Invalid status"});const r=await pool.query("select * from customer_update_requests where id=$1",[id]);const reqr=r.rows[0];if(!reqr)return json(res,404,{error:"Request not found"});if(status==="approved"){const c=reqr.changes||{};const fields=["name","phone","address","vehicle_no"].filter(k=>Object.prototype.hasOwnProperty.call(c,k));if(fields.length){const vals=fields.map(k=>c[k]);const sets=fields.map((k,i)=>`${k}=$${i+1}`).join(",");await pool.query(`update customers set ${sets} where id=$${fields.length+1}`,[...vals,reqr.customer_id]);}}const out=await pool.query("update customer_update_requests set status=$1,reviewed_by=$2,reviewed_at=now() where id=$3 returning *",[status,u.id,id]);return json(res,200,out.rows[0])}
+if(req.method==="PATCH"&&parts[0]==="customer-update-requests"&&id){
+  const u=requireAuth(req,res,["ceo"]);if(!u)return;
+  const{status}=req.body||{};
+  if(!["approved","rejected"].includes(status))return json(res,400,{error:"Invalid status"});
+  const r=await pool.query("select * from customer_update_requests where id=$1",[id]);
+  const reqr=r.rows[0];
+  if(!reqr)return json(res,404,{error:"Request not found"});
+  if(reqr.status!=="pending")return json(res,409,{error:"This update request has already been processed"});
+  if(status==="approved"){
+    const customer=await pool.query("select id from customers where id=$1",[reqr.customer_id]);
+    if(!customer.rowCount)return json(res,404,{error:"Customer no longer exists"});
+    const ch=reqr.changes||{};
+    const fields=["name","phone","address","vehicle_no"].filter(k=>Object.prototype.hasOwnProperty.call(ch,k));
+    if(fields.length){
+      if(Object.hasOwn(ch,"phone")){
+        const phone=String(ch.phone).replace(/\\D/g,"");
+        if(phone.length!==10)return json(res,400,{error:"Invalid mobile number in update request"});
+        const dup=await pool.query("select id from customers where phone=$1 and id<>$2",[String(ch.phone),reqr.customer_id]);
+        if(dup.rowCount)return json(res,409,{error:"Mobile number already belongs to another customer"});
+      }
+      const vals=fields.map(k=>ch[k]);
+      const sets=fields.map((k,i)=>k+"=$"+(i+1)).join(",");
+      const updated=await pool.query("update customers set "+sets+" where id=$"+(fields.length+1)+" returning id",[...vals,reqr.customer_id]);
+      if(!updated.rowCount)return json(res,409,{error:"Customer could not be updated"});
+    }
+  }
+  const out=await pool.query("update customer_update_requests set status=$1,reviewed_by=$2,reviewed_at=now() where id=$3 and status='pending' returning *",[status,u.id,id]);
+  if(!out.rowCount)return json(res,409,{error:"This update request was already processed"});
+  await audit(u,status==="approved"?"customer_update_approved":"customer_update_rejected","customer_update_request",id,{customer_id:reqr.customer_id});
+  return json(res,200,out.rows[0]);
+}
 if(req.method==="DELETE"&&parts[0]==="customers"&&id){if(!requireAuth(req,res,["ceo","admin"]))return;await pool.query("delete from customers where id=$1",[id]);return res.status(204).end()}
 if(req.method==="GET"&&path==="requests"){if(!requireAuth(req,res,["ceo","admin","division_manager","area_manager","tl","staff","telecaller"]))return;const r=await pool.query("select sr.*,c.name customer_name,c.phone customer_phone,c.vehicle_no,mo.status mechanic_order_status,mo.technician_id,mo.technician_name from service_requests sr left join customers c on c.id=sr.customer_id left join mechanic_orders mo on mo.request_id=sr.id order by sr.created_at desc");return json(res,200,r.rows)}
 if(req.method==="POST"&&path==="requests"){if(!requireAuth(req,res,["ceo","admin","division_manager","area_manager","tl","staff","telecaller"]))return;const{customer_id,location="",description=""}=req.body||{};if(!customer_id)return json(res,400,{error:"Registered customer is required"});const c=await pool.query("select id from customers where id=$1",[customer_id]);if(!c.rowCount)return json(res,400,{error:"Registered customer is required"});const r=await pool.query("insert into service_requests(customer_id,location,description) values($1,$2,$3) returning *",[customer_id,location,description]);return json(res,201,r.rows[0])}

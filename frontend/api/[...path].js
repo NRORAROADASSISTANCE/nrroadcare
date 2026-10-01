@@ -378,15 +378,24 @@ if(req.method==="POST"&&path==="payments"){
   const customer=await pool.query("select id from customers where id=$1",[customerId]);
   if(!customer.rowCount)return json(res,404,{error:"Customer not found"});
   if(cleanRef){
-    const dup=await pool.query("select id,customer_id,status from payments where transaction_ref=$1 and status='captured' limit 1",[cleanRef]);
+    const dup=await pool.query("select id from payments where transaction_ref=$1 and status='captured' limit 1",[cleanRef]);
     if(dup.rowCount)return json(res,409,{error:"This transaction reference has already been recorded"});
   }
-  const payment=await pool.query("insert into payments(customer_id,amount,method,transaction_ref,received_by,received_by_username,received_by_role) values($1,$2,$3,$4,$5,$6,$7) returning *",[customerId,paymentAmount,cleanMethod,cleanRef,u.id,u.username,u.role]);
-  const receiptNo="NR-"+new Date().getFullYear()+"-"+crypto.randomBytes(4).toString("hex").toUpperCase();
-  const receipt=await pool.query("insert into receipts(customer_id,payment_id,receipt_no) values($1,$2,$3) returning *",[customerId,payment.rows[0].id,receiptNo]);
-  await pool.query("insert into activity_logs(user_id,username,role,action,entity_type,entity_id,details) values($1,$2,$3,'payment_received',$4,$5,$6)",[u.id,u.username,u.role,payment.rows[0].id,JSON.stringify({amount:paymentAmount,method:cleanMethod,transaction_ref:cleanRef})]);
-  await audit(u,"payment_received","payment",payment.rows[0].id,{customer_id:customerId,amount:paymentAmount,method:cleanMethod,transaction_ref:cleanRef,receipt_no:receiptNo});
-  return json(res,201,{payment:payment.rows[0],receipt:receipt.rows[0]});
+  const db=await pool.connect();
+  try{
+    await db.query("begin");
+    const payment=await db.query("insert into payments(customer_id,amount,method,transaction_ref,received_by,received_by_username,received_by_role) values($1,$2,$3,$4,$5,$6,$7) returning *",[customerId,paymentAmount,cleanMethod,cleanRef,u.id,u.username,u.role]);
+    const receiptNo="NR-"+new Date().getFullYear()+"-"+crypto.randomBytes(4).toString("hex").toUpperCase();
+    const receipt=await db.query("insert into receipts(customer_id,payment_id,receipt_no) values($1,$2,$3) returning *",[customerId,payment.rows[0].id,receiptNo]);
+    await db.query("commit");
+    await pool.query("insert into activity_logs(user_id,username,role,action,entity_type,entity_id,details) values($1,$2,$3,'payment_received',$4,$5,$6)",[u.id,u.username,u.role,payment.rows[0].id,JSON.stringify({amount:paymentAmount,method:cleanMethod,transaction_ref:cleanRef})]);
+    await audit(u,"payment_received","payment",payment.rows[0].id,{customer_id:customerId,amount:paymentAmount,method:cleanMethod,transaction_ref:cleanRef,receipt_no:receiptNo});
+    return json(res,201,{payment:payment.rows[0],receipt:receipt.rows[0]});
+  }catch(e){
+    try{await db.query("rollback")}catch{}
+    if(e?.code==="23505")return json(res,409,{error:"This payment or transaction reference already exists"});
+    throw e;
+  }finally{db.release()}
 }
 if(req.method==="POST"&&path==="memberships/renew"){
   const u=requireAuth(req,res,["ceo","admin","division_manager","area_manager","tl","staff"]);if(!u)return;

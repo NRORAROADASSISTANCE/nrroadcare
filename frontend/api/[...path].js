@@ -76,7 +76,17 @@ $`);
  await pool.query("alter table technicians add column if not exists created_by_role varchar(30)");
 }
 async function audit(u,action,entityType,entityId,details={}){
- await pool.query("insert into nrora_audit_logs(actor_id,actor_username,actor_role,action,entity_type,entity_id,details) values($1,$2,$3,$4,$5,$6,$7)",[u?.id||null,u?.username||null,u?.role||null,action,entityType,String(entityId??""),JSON.stringify(details)]);
+ const safeDetails=details&&typeof details==="object"?details:{};
+ await pool.query("insert into nrora_audit_logs(actor_id,actor_username,actor_role,action,entity_type,entity_id,details) values($1,$2,$3,$4,$5,$6,$7)",[u?.id||null,u?.username||null,u?.role||null,action,entityType,String(entityId??""),JSON.stringify(safeDetails)]);
+}
+async function auditDataChange(u,action,entityType,entityId,before,after,extra={}){
+ const sanitize=(row)=>{
+   if(!row||typeof row!=="object")return row;
+   const copy={...row};
+   for(const key of ["password","password_hash","session_token","token","secret","otp"])if(key in copy)copy[key]="[REDACTED]";
+   return copy;
+ };
+ await audit(u,action,entityType,entityId,{...extra,before:sanitize(before),after:sanitize(after)});
 }
 async function schema(){await pool.query(`create table if not exists customers(id bigserial primary key,name varchar(120) not null,phone varchar(20) not null,address text default '',vehicle_no varchar(30) not null,created_at timestamptz default now());
 alter table customers add column if not exists mobile_verified boolean not null default false;

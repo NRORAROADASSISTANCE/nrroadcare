@@ -41,6 +41,17 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: Resolve Kotlin duplicate standard libraries
+        working-directory: frontend/android
+        run: |
+          cat >> app/build.gradle <<'GRADLE'
+
+          configurations.configureEach {
+              exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+              exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+          }
+          GRADLE
+
       - name: Build Android APK and AAB
         working-directory: frontend/android
         run: |

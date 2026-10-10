@@ -1,0 +1,18 @@
+{
+  "name": "NRORA Road Assistance",
+  "short_name": "NRORA",
+  "description": "24×7 roadside assistance for eligible cars and four-wheelers",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#eef3f9",
+  "theme_color": "#0755b8",
+  "icons": [
+    {
+      "src": "/nrora-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

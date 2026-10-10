@@ -9,10 +9,11 @@
   "theme_color": "#0755b8",
   "icons": [
     {
-      "src": "/nrora-app-icon.svg",
+      "src": "/nrora-app-icon-v2.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "id": "/?app=nrora-v2"
 }

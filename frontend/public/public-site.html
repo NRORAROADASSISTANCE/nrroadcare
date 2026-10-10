@@ -5,7 +5,7 @@ html{scroll-behavior:smooth}
 body{margin:0;font-family:Inter,Arial,sans-serif;background:#f5f9ff;color:var(--navy)}
 a{text-decoration:none;color:inherit}
 .nav{position:sticky;top:0;z-index:20;background:#ffffffed;border-bottom:1px solid #dce8f5;backdrop-filter:blur(14px)}
-.navin,.wrap{width:min(1500px,100% - 48px);margin:auto}
+.navin,.wrap{width:min(1500px,calc(100% - 48px));margin:auto}
 .navin{min-height:88px;display:flex;align-items:center;justify-content:space-between;gap:24px}
 .brand{display:flex;align-items:center;gap:10px;min-width:230px;color:var(--navy)}
 .brand-mark{height:52px;width:58px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(145deg,#0da8ff,#0749bf);color:white;font-size:22px;font-weight:1000;letter-spacing:-2px;box-shadow:0 7px 16px #075be82a}
@@ -20,7 +20,7 @@ a{text-decoration:none;color:inherit}
 .hero{position:relative;isolation:isolate;min-height:690px;padding:65px 24px 170px;overflow:hidden;background:linear-gradient(180deg,#e8f5ff 0%,#f7fbff 80%,#eaf4ff 100%)}
 .hero:before{content:"";position:absolute;z-index:-2;inset:0 0 0 25%;background-image:url("https://www.towtrucksanjose.com/images/mega_menu_roadside.png");background-size:cover;background-position:center 46%;background-repeat:no-repeat}
 .hero:after{content:"";position:absolute;z-index:-1;inset:0;background:linear-gradient(90deg,#f5fbff 0%,rgba(245,251,255,.98) 25%,rgba(245,251,255,.87) 39%,rgba(245,251,255,.28) 57%,rgba(245,251,255,0) 75%),linear-gradient(0deg,rgba(236,246,255,.92) 0%,rgba(236,246,255,0) 22%)}
-.hero-inner{width:min(1500px,100% - 48px);margin:auto}
+.hero-inner{width:min(1500px,calc(100% - 48px));margin:auto}
 .hero-copy{max-width:700px;position:relative;z-index:2}
 .tag{display:inline-flex;align-items:center;gap:9px;padding:9px 15px;border-radius:30px;background:#e0efff;color:#0755cf;font-size:12px;font-weight:900;letter-spacing:1.1px}
 .tag-dot{height:9px;width:9px;background:#0879ef;border-radius:50%;box-shadow:0 0 0 4px #0c7bf21c}

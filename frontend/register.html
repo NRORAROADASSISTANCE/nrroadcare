@@ -6,6 +6,42 @@
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#eef3f9;color:#10233f}.wrap{max-width:980px;margin:28px auto;padding:16px}.card{background:#fff;border-radius:18px;box-shadow:0 12px 35px #10233f22;overflow:hidden}.head{padding:20px 24px;background:linear-gradient(120deg,#0b2d5c,#1765e8);color:#fff}.head h1{margin:0 0 5px;font-size:23px}.head p{margin:0;font-size:12px;opacity:.9}.body{padding:20px}.section{border:1px solid #d7e2ef;border-radius:13px;padding:16px;margin-bottom:15px}.section h2{font-size:15px;margin:0 0 13px;display:flex;align-items:center;gap:8px;color:#12365f}.grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.field{display:grid;gap:5px;font-size:10px;font-weight:800;color:#52677f}.field.full{grid-column:1/-1}input,textarea,select{width:100%;padding:10px 11px;border:1px solid #cbd8e8;border-radius:9px;background:#fff;font-size:14px;color:#172b45;outline:none}input:focus,textarea:focus,select:focus{border-color:#1765e8;box-shadow:0 0 0 2px #1765e815}.pinrow{display:flex;gap:7px}.pinrow input{flex:1}.search{border:0;border-radius:9px;padding:0 14px;background:#1765e8;color:#fff;font-weight:800;cursor:pointer}.search:disabled{opacity:.6;cursor:wait}.help{margin-top:8px;font-size:10px;color:#6b7d93}.geo{margin-top:8px;font-size:11px;font-weight:700}.photos{display:grid;grid-template-columns:1fr 1fr;gap:13px}.photo-preview{margin-top:8px;max-height:150px;width:100%;object-fit:contain;border:1px solid #d7e0ee;border-radius:10px}.pay{width:100%;border:0;border-radius:10px;padding:14px;background:#1765e8;color:#fff;font-weight:800;font-size:15px;cursor:pointer}.pay:disabled{opacity:.65;cursor:wait}.status{margin-top:14px;padding:13px;border-radius:10px;background:#f2f6fb;font-size:13px}.success{background:#e8f8ef;color:#146c43}.error{background:#fff0f0;color:#a21d1d}.required{color:#c62828}.small{font-size:11px;color:#63748b;margin:0 0 15px}@media(max-width:800px){.grid,.photos{grid-template-columns:minmax(0,1fr)}.field,.field input,.field select,.pinrow{min-width:0}.field.full{grid-column:auto}.wrap{margin:8px auto;padding:8px}.head{padding:17px}.head h1{font-size:20px}.body{padding:12px}.section{padding:12px}.pay{font-size:14px;padding:14px 10px}}
+/* Mobile comfort layout: tighter spacing without changing the blue-and-white design */
+@media(max-width:600px){
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  body{font-size:15px;background:#f3f6fb}
+  .wrap{width:100%;max-width:100%;margin:0 auto;padding:6px}
+  .card{border-radius:14px;box-shadow:0 5px 18px #10233f12}
+  .head{padding:15px 16px}
+  .head h1{font-size:19px;line-height:1.25}
+  .head p{font-size:11px;line-height:1.4;margin-top:4px}
+  .body{padding:10px}
+  .small{font-size:11px;line-height:1.45;margin-bottom:10px}
+  .section{padding:11px;margin-bottom:10px;border-radius:12px}
+  .section h2{font-size:14px;line-height:1.3;margin-bottom:10px}
+  .grid,.photos{grid-template-columns:minmax(0,1fr);gap:9px}
+  .field{font-size:10px;gap:5px;line-height:1.3;min-width:0}
+  input,textarea,select{width:100%;min-width:0;min-height:44px;padding:10px;font-size:16px;line-height:1.25;border-radius:8px}
+  .pinrow{display:flex;gap:6px;min-width:0}
+  .pinrow input{min-width:0;width:1%;flex:1}
+  .search{min-height:44px;padding:0 11px;white-space:nowrap}
+  input[type=file]{font-size:13px;padding:8px;max-width:100%}
+  input[type=file]::file-selector-button{font-size:13px;padding:7px 9px;margin-right:7px}
+  .photo-preview{max-height:120px}
+  .help{font-size:10px;line-height:1.45;margin-top:6px}
+  .geo{font-size:11px;line-height:1.4}
+  .pay{min-height:48px;padding:13px 10px;font-size:15px;border-radius:10px}
+  .status{font-size:12px;line-height:1.5;padding:11px;margin-top:10px;overflow-wrap:anywhere}
+}
+@media(max-width:360px){
+  .wrap{padding:4px}
+  .body{padding:8px}
+  .head{padding:13px}
+  .head h1{font-size:18px}
+  .section{padding:9px}
+  .pinrow{gap:5px}
+  .search{padding:0 8px;font-size:12px}
+}
 </style>
 </head>
 <body>

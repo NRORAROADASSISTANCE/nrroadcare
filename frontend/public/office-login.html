@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0755b8"><title>NRORA | Office Login</title>
+<style>
+:root{--blue:#075be8;--navy:#0c2146;--muted:#52647d;--line:#dce8f6}*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:linear-gradient(135deg,#edf6ff,#f8fbff);font-family:Inter,Arial,sans-serif;color:var(--navy);display:grid;grid-template-rows:auto 1fr}
+header{background:#fff;border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+header img{width:150px;height:72px;object-fit:contain;object-position:left center}a{color:var(--blue);font-weight:800;text-decoration:none}
+main{width:min(480px,calc(100% - 28px));margin:32px auto;align-self:start}.card{background:white;border:1px solid var(--line);border-radius:22px;box-shadow:0 18px 50px #173e7014;overflow:hidden}
+.hero{padding:25px 28px;background:linear-gradient(120deg,#0b2d5c,#1464df);color:white}.hero h1{margin:0 0 8px;font-size:28px}.hero p{margin:0;line-height:1.5;opacity:.92}
+.pad{padding:25px 28px}label{display:block;margin:0 0 16px;font-size:12px;font-weight:850;color:#4b607b}input{display:block;width:100%;margin-top:7px;padding:14px;border:1px solid #cbd8e7;border-radius:11px;font-size:16px;outline:none}input:focus{border-color:var(--blue);box-shadow:0 0 0 3px #075be81c}
+button{display:inline-flex;justify-content:center;align-items:center;border:0;border-radius:11px;background:linear-gradient(120deg,#1298f5,#0753e5);color:white;font-weight:850;padding:14px 20px;font-size:14px;cursor:pointer}.wide{width:100%}button:disabled{opacity:.6;cursor:wait}
+.message{display:none;margin-top:14px;padding:12px;border-radius:10px;font-size:13px;line-height:1.5}.error{display:block;background:#fff0f0;color:#a51e2b}.success{display:block;background:#eaf9f1;color:#087f5b}
+#verified{display:none;margin-top:16px;padding:16px;border:1px solid #b7e4cb;background:#f0fbf5;border-radius:14px}#verified.show{display:block}.role{display:inline-block;margin:7px 0;padding:6px 10px;border-radius:999px;background:#dbeafe;color:#1748a0;font-weight:900;font-size:12px}.note{font-size:12px;line-height:1.6;color:var(--muted);margin-bottom:0}
+@media(max-width:520px){header{padding:8px 14px}header img{width:120px;height:58px}.hero{padding:21px}.pad{padding:20px}.hero h1{font-size:25px}}
+</style></head>
+<body><header><a href="/public-site.html"><img src="/nrora-3d-small.jpg" alt="NRORA Road Assistance"></a><a href="/public-site.html">← Website</a></header>
+<main><section class="card"><div class="hero"><h1>Office Login</h1><p>For NRORA employees, managers, staff and mechanics.</p></div><div class="pad">
+<form id="loginForm" autocomplete="on"><label>USERNAME<input id="username" name="username" autocomplete="username" required placeholder="Enter your office username"></label><label>PASSWORD<input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Enter your password"></label><button id="loginBtn" class="wide" type="submit">Verify &amp; Sign In</button><div id="message" class="message" role="status" aria-live="polite"></div></form>
+<div id="verified"><strong>✓ Designation Verified</strong><div id="roleBadge" class="role"></div><div id="welcome"></div><p class="note">Your login has been verified. Open the dashboard assigned to your designation.</p><button id="openDashboard" class="wide" type="button" style="margin-top:12px">Open My Dashboard →</button></div>
+<p class="note">Use the username and password assigned by NRORA management. Your designation and dashboard access are checked against your employee account. If access is denied, contact your manager or CEO.</p>
+</div></section></main>
+<script>
+const $=id=>document.getElementById(id);
+const roleNames={ceo:"CEO",admin:"Main Admin",division_manager:"Division Manager",area_manager:"Area Manager",tl:"Team Leader (TL)",staff:"Staff",telecaller:"Telecaller",mechanic:"Mechanic"};
+let destination="/?office=1#/";
+function showMessage(text,type){const el=$("message");el.textContent=text;el.className="message "+type}
+$("loginForm").addEventListener("submit",async e=>{
+ e.preventDefault();$("loginBtn").disabled=true;$("verified").classList.remove("show");showMessage("Checking username, password and designation…","success");
+ try{
+  const res=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:$("username").value.trim(),password:$("password").value})});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok||!data.token||!data.user)throw new Error(data.error||"Login verification failed. Please check your details.");
+  const role=String(data.user.role||"").toLowerCase();
+  if(!roleNames[role])throw new Error("Your account has no valid designation. Contact NRORA management.");
+  sessionStorage.setItem("nrora_token",data.token);
+  if(role==="ceo"){sessionStorage.setItem("nrora_ceo_token",data.token);destination="/?ceo=1#/";}
+  else{sessionStorage.removeItem("nrora_ceo_token");destination=role==="mechanic"?"/mechanic-orders.html":"/?office=1#/";}
+  $("roleBadge").textContent=roleNames[role];
+  $("welcome").textContent="Welcome, "+String(data.user.name||data.user.username||"NRORA team member")+".";
+  $("verified").classList.add("show");showMessage("Login successful. Designation verified.","success");
+  $("loginForm").style.display="none";
+ }catch(err){showMessage(err.message||"Unable to sign in. Please try again.","error");}
+ finally{$("loginBtn").disabled=false;}
+});
+$("openDashboard").addEventListener("click",()=>{location.href=destination});
+</script></body></html>

@@ -15,7 +15,19 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "NRORA@123";
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || "";
 const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || "";
 const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET || "";
-const MEMBERSHIP_AMOUNT = 4500;
+const GST_RATE = 18;
+const MEMBERSHIP_PLANS = {
+  standard: { code: "standard", name: "Standard", baseAmount: 4999, serviceLimit: 3 },
+  pro: { code: "pro", name: "Pro", baseAmount: 6999, serviceLimit: 5 }
+};
+function membershipPlan(code) {
+  return MEMBERSHIP_PLANS[String(code || "standard").toLowerCase()] || null;
+}
+function membershipPrice(plan) {
+  const basePaise = plan.baseAmount * 100;
+  const gstPaise = Math.round(basePaise * GST_RATE / 100);
+  return { baseAmount: plan.baseAmount, gstAmount: gstPaise / 100, gstRate: GST_RATE, totalAmount: (basePaise + gstPaise) / 100, totalPaise: basePaise + gstPaise };
+}
 
 app.use(cors({ origin: process.env.FRONTEND_ORIGIN?.split(",") || "*" }));
 app.post("/api/payments/webhook", express.raw({type:"application/json"}), async (req,res)=>{
@@ -59,6 +71,14 @@ async function ensurePaymentSchema(){
   await pool.query("alter table payments add column if not exists gateway_payment_id varchar(120) default ''");
   await pool.query("create unique index if not exists payments_gateway_order_idx on payments(gateway_order_id) where gateway_order_id <> ''");
   await pool.query("create unique index if not exists payments_gateway_payment_idx on payments(gateway_payment_id) where gateway_payment_id <> ''");
+  await pool.query("alter table payments add column if not exists base_amount numeric(12,2)");
+  await pool.query("alter table payments add column if not exists gst_amount numeric(12,2) not null default 0");
+  await pool.query("alter table payments add column if not exists gst_rate numeric(5,2) not null default 18");
+  await pool.query("alter table payments add column if not exists plan_code varchar(20) not null default 'standard'");
+  await pool.query("alter table payments add column if not exists service_limit integer not null default 3");
+  await pool.query("alter table memberships add column if not exists plan_code varchar(20) not null default 'standard'");
+  await pool.query("alter table memberships add column if not exists service_limit integer not null default 3");
+  await pool.query("alter table memberships add column if not exists services_used integer not null default 0");
 }
 async function ensureOperationsSchema(){
   await pool.query(`create table if not exists mechanics(
@@ -126,7 +146,9 @@ async function finalizeCapturedPayment({orderId,paymentId,amount,method="UPI",tr
   const receipt=await makeReceipt(current.customer_id,current.id);
   const active=await pool.query("select id from memberships where customer_id=$1 and renewal_date>=current_date order by renewal_date desc limit 1",[current.customer_id]);
   if(!active.rowCount){
-    await pool.query("insert into memberships(customer_id,amount,renewal_date) values($1,4500,(current_date + interval '1 year')::date)",[current.customer_id]);
+    const plan = membershipPlan(current.plan_code) || MEMBERSHIP_PLANS.standard;
+    const baseAmount = Number(current.base_amount || current.amount || plan.baseAmount);
+    await pool.query("insert into memberships(customer_id,amount,renewal_date,plan_code,service_limit,services_used) values($1,$2,(current_date + interval '1 year')::date,$3,$4,0)",[current.customer_id,baseAmount,plan.code,Number(current.service_limit || plan.serviceLimit)]);
   }
   await pool.query("update customers set account_status='active',mobile_verified=true,membership_start=current_date,membership_end=(current_date + interval '1 year')::date where id=$1",[current.customer_id]);
   return {payment:updated.rows[0],receipt};
@@ -163,13 +185,16 @@ app.post("/api/customers",permissionAuth("customers_create"),asyncRoute(async(re
 }));
 
 app.post("/api/public/customer-register",asyncRoute(async(req,res)=>{
-  const {name,phone,address="",vehicle_no,house_number="",landmark="",state="Telangana",district="",mandal="",village="",pincode="",vehicle_type="",make_brand="",model="",variant="",manufacturing_year="",color="",rc_number="",referral_code=""}=req.body;
+  const {name,phone,address="",vehicle_no,house_number="",landmark="",state="Telangana",district="",mandal="",village="",pincode="",vehicle_type="",make_brand="",model="",variant="",manufacturing_year="",color="",rc_number="",referral_code="",plan_code="standard"}=req.body;
   if(!name||!/^[0-9]{10}$/.test(String(phone||""))||!vehicle_no||!/^[0-9]{6}$/.test(String(pincode||""))) return res.status(400).json({error:"Name, valid 10-digit mobile, vehicle number and 6-digit PIN are required"});
+  const plan = membershipPlan(plan_code);
+  if(!plan) return res.status(400).json({error:"Please select a valid NRORA membership plan"});
+  const price = membershipPrice(plan);
   const c=await pool.query(`insert into customers(name,phone,address,vehicle_no,house_number,landmark,state,district,mandal,village,pincode,vehicle_type,make_brand,model,variant,manufacturing_year,color,rc_number,account_status,referral_code) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'inactive',$19) returning id,name,phone,vehicle_no`,[name,phone,address,vehicle_no,house_number,landmark,state,district,mandal,village,pincode,vehicle_type,make_brand,model,variant,manufacturing_year,color,rc_number,referral_code]);
   const customer=c.rows[0];
-  const order=await razorpayRequest("/orders","POST",{amount:MEMBERSHIP_AMOUNT*100,currency:"INR",receipt:`NRORA-P-${customer.id}-${Date.now()}`,payment_capture:1,notes:{customer_id:String(customer.id),customer_name:customer.name,vehicle_no:customer.vehicle_no}});
-  const payment=await pool.query("insert into payments(customer_id,amount,method,transaction_ref,status,gateway_order_id) values($1,$2,'UPI','',$3,$4) returning id",[customer.id,MEMBERSHIP_AMOUNT,"pending",order.id]);
-  res.status(201).json({customer,orderId:order.id,keyId:RAZORPAY_KEY_ID,amount:MEMBERSHIP_AMOUNT*100,currency:"INR",paymentId:payment.rows[0].id});
+  const order=await razorpayRequest("/orders","POST",{amount:price.totalPaise,currency:"INR",receipt:`NRORA-P-${customer.id}-${Date.now()}`,payment_capture:1,notes:{customer_id:String(customer.id),customer_name:customer.name,vehicle_no:customer.vehicle_no,plan_code:plan.code,service_limit:String(plan.serviceLimit),base_amount:String(price.baseAmount),gst_amount:String(price.gstAmount)}});
+  const payment=await pool.query("insert into payments(customer_id,amount,base_amount,gst_amount,gst_rate,plan_code,service_limit,method,transaction_ref,status,gateway_order_id) values($1,$2,$3,$4,$5,$6,$7,'UPI','',$8,$9) returning id",[customer.id,price.totalAmount,price.baseAmount,price.gstAmount,price.gstRate,plan.code,plan.serviceLimit,"pending",order.id]);
+  res.status(201).json({customer,orderId:order.id,keyId:RAZORPAY_KEY_ID,amount:price.totalPaise,currency:"INR",paymentId:payment.rows[0].id,planCode:plan.code,planName:plan.name,serviceLimit:plan.serviceLimit,baseAmount:price.baseAmount,gstRate:price.gstRate,gstAmount:price.gstAmount,totalAmount:price.totalAmount});
 }));
 
 app.post("/api/public/customer-register/verify",asyncRoute(async(req,res)=>{
@@ -225,12 +250,15 @@ app.patch("/api/mechanic-orders",auth(["mechanic","admin","division_manager","ar
 
 app.post("/api/payments/create-order",auth(["ceo","admin","employee","staff","telecaller"]),asyncRoute(async(req,res)=>{
   const customerId=Number(req.body.customer_id); if(!customerId) return res.status(400).json({error:"customer_id is required"});
+  const plan = membershipPlan(req.body.plan_code || "standard");
+  if(!plan) return res.status(400).json({error:"Please select a valid NRORA membership plan"});
+  const price = membershipPrice(plan);
   const c=await pool.query("select id,name,phone,vehicle_no from customers where id=$1",[customerId]); if(!c.rowCount) return res.status(404).json({error:"Customer not found"});
-  const order=await razorpayRequest("/orders","POST",{amount:MEMBERSHIP_AMOUNT*100,currency:"INR",receipt:`NRORA-${customerId}-${Date.now()}`,payment_capture:1,notes:{customer_id:String(customerId),customer_name:c.rows[0].name,vehicle_no:c.rows[0].vehicle_no}});
-  const payment=await pool.query("insert into payments(customer_id,amount,method,transaction_ref,status,gateway_order_id) values($1,$2,'UPI','',$3,$4) returning *",[customerId,MEMBERSHIP_AMOUNT,"pending",order.id]);
+  const order=await razorpayRequest("/orders","POST",{amount:price.totalPaise,currency:"INR",receipt:`NRORA-${customerId}-${Date.now()}`,payment_capture:1,notes:{customer_id:String(customerId),customer_name:c.rows[0].name,vehicle_no:c.rows[0].vehicle_no,plan_code:plan.code,service_limit:String(plan.serviceLimit),base_amount:String(price.baseAmount),gst_amount:String(price.gstAmount)}});
+  const payment=await pool.query("insert into payments(customer_id,amount,base_amount,gst_amount,gst_rate,plan_code,service_limit,method,transaction_ref,status,gateway_order_id) values($1,$2,$3,$4,$5,$6,$7,'UPI','',$8,$9) returning *",[customerId,price.totalAmount,price.baseAmount,price.gstAmount,price.gstRate,plan.code,plan.serviceLimit,"pending",order.id]);
   let qr=null;
-  try { qr=await razorpayRequest("/payments/qr_codes","POST",{type:"upi_qr",name:`NRORA ${c.rows[0].name}`,usage:"single_use",fixed_amount:true,payment_amount:MEMBERSHIP_AMOUNT*100,description:`NRORA yearly membership - ${c.rows[0].vehicle_no}`,close_by:Math.floor(Date.now()/1000)+7200,notes:{payment_id:String(payment.rows[0].id),customer_id:String(customerId)}}); } catch(e){ console.warn("Razorpay QR unavailable:",e.message); }
-  res.status(201).json({orderId:order.id,keyId:RAZORPAY_KEY_ID,amount:MEMBERSHIP_AMOUNT*100,currency:"INR",paymentId:payment.rows[0].id,qr:qr?{id:qr.id,image_url:qr.image_url||"",status:qr.status}:null,customer:c.rows[0]});
+  try { qr=await razorpayRequest("/payments/qr_codes","POST",{type:"upi_qr",name:`NRORA ${c.rows[0].name}`,usage:"single_use",fixed_amount:true,payment_amount:price.totalPaise,description:`NRORA ${plan.name} membership - ${c.rows[0].vehicle_no}`,close_by:Math.floor(Date.now()/1000)+7200,notes:{payment_id:String(payment.rows[0].id),customer_id:String(customerId),plan_code:plan.code}}); } catch(e){ console.warn("Razorpay QR unavailable:",e.message); }
+  res.status(201).json({orderId:order.id,keyId:RAZORPAY_KEY_ID,amount:price.totalPaise,currency:"INR",paymentId:payment.rows[0].id,planCode:plan.code,planName:plan.name,serviceLimit:plan.serviceLimit,baseAmount:price.baseAmount,gstRate:price.gstRate,gstAmount:price.gstAmount,totalAmount:price.totalAmount,qr:qr?{id:qr.id,image_url:qr.image_url||"",status:qr.status}:null,customer:c.rows[0]});
 }));
 app.post("/api/payments/verify",auth(["ceo","admin","employee","staff","telecaller"]),asyncRoute(async(req,res)=>{
   const {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body; if(!razorpay_order_id||!razorpay_payment_id||!razorpay_signature) return res.status(400).json({error:"Incomplete payment verification data"});

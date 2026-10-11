@@ -22,6 +22,10 @@
       "destination": "/ceo.html"
     },
     {
+      "source": "/customer-login",
+      "destination": "/customer-login.html"
+    },
+    {
       "source": "/customer-register",
       "destination": "/register.html"
     },

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>NRORA Customer Login & Referral Rewards</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#eef3f9;color:#10233f}.wrap{max-width:760px;margin:28px auto;padding:16px}.card{background:#fff;border-radius:18px;box-shadow:0 12px 35px #10233f22;overflow:hidden}.head{padding:22px 24px;background:linear-gradient(120deg,#0b2d5c,#1765e8);color:#fff}.head h1{margin:0 0 7px;font-size:23px}.head p{margin:0;font-size:13px;opacity:.92}.body{padding:22px}.field{display:grid;gap:6px;margin-bottom:14px;font-size:11px;font-weight:800;color:#52677f}input{width:100%;padding:12px;border:1px solid #cbd8e8;border-radius:9px;font-size:15px;background:#fff;color:#10233f}button{border:0;border-radius:10px;padding:12px 16px;background:#1765e8;color:#fff;font-size:14px;font-weight:800;cursor:pointer}button:disabled{opacity:.6;cursor:wait}.secondary{background:#e9f1ff;color:#164a94}.status{display:none;margin:12px 0;padding:12px;border-radius:9px;font-size:13px;line-height:1.5}.error{display:block;background:#fff0f0;color:#a32323}.success{display:block;background:#eaf8ef;color:#176b36}.muted{color:#667991;font-size:13px;line-height:1.5}.hidden{display:none!important}.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}.stat{padding:16px;border:1px solid #dce7f5;border-radius:12px;background:#f8fbff}.stat small{display:block;color:#637791;font-weight:700;font-size:11px}.stat strong{display:block;font-size:26px;margin-top:7px;color:#133c75}.linkbox{padding:14px;background:#f4f8ff;border:1px solid #cbdcf4;border-radius:12px;overflow-wrap:anywhere;line-height:1.5;font-size:13px}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}.toplink{color:#fff;font-size:13px;font-weight:700}@media(max-width:520px){.wrap{padding:9px;margin:10px auto}.body{padding:16px}.head{padding:18px}.stats{gap:8px}.stat{padding:12px}}
+</style>
+</head>
+<body><div class="wrap"><div class="card">
+<div class="head"><h1>NRORA Customer Login</h1><p>Access your private referral link and annual referral progress.</p><p style="margin-top:10px"><a class="toplink" href="/register">New Customer Registration</a></p></div>
+<div class="body">
+<form id="loginForm">
+<label class="field">REGISTERED MOBILE NUMBER<input id="phone" inputmode="numeric" maxlength="10" pattern="[0-9]{10}" required autocomplete="tel" placeholder="10-digit mobile number"></label>
+<label class="field">VEHICLE REGISTRATION NUMBER<input id="vehicle" required autocapitalize="characters" placeholder="TS09AB1234"></label>
+<label class="field">CHASSIS NUMBER<input id="chassis" required minlength="5" maxlength="30" autocapitalize="characters" placeholder="Registered chassis number"></label>
+<button id="loginBtn" type="submit" style="width:100%">Secure Customer Login</button>
+</form>
+<div id="status" class="status"></div>
+<section id="dashboard" class="hidden">
+<h2 style="margin:6px 0">Referral Rewards</h2>
+<p id="welcome" class="muted"></p>
+<div class="stats"><div class="stat"><small>SUCCESSFUL REFERRALS · ALL TIME</small><strong id="total">0</strong></div><div class="stat"><small>THIS CALENDAR YEAR</small><strong id="year">0 / 20</strong></div></div>
+<div style="height:9px;background:#e6edf7;border-radius:99px;overflow:hidden"><div id="progress" style="height:100%;width:0;background:#218838;border-radius:99px"></div></div>
+<p class="muted">Only new customers who register through your private share link, complete payment and activate membership count. Public registrations without your signed share link do not count.</p>
+<h3 style="margin-bottom:8px">Your Private Referral Link</h3><div id="shareLink" class="linkbox">Loading your secure link…</div>
+<div class="actions"><button id="copyBtn" type="button" class="secondary">Copy Link</button><button id="shareBtn" type="button">Share Link</button><button id="logoutBtn" type="button" class="secondary">Logout</button></div>
+<p class="muted">Referral rewards are subject to NRORA verification and the published annual reward rules.</p>
+</section>
+</div></div></div>
+<script>
+const $=id=>document.getElementById(id);
+let customerToken=localStorage.getItem("nrora_customer_token")||"";
+function status(message,type="error"){const s=$("status");s.className="status "+type;s.textContent=message;s.style.display="block"}
+async function api(action,method="GET",body){const r=await fetch("/api/customer-register?action="+action,{method,headers:{"Content-Type":"application/json",...(customerToken?{Authorization:"Bearer "+customerToken}:{})},body:body?JSON.stringify(body):undefined,cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Request failed");return d}
+async function loadDashboard(){const info=await api("referral-info");const link=await api("referral-link");$("welcome").textContent="Welcome, "+(info.customer?.name||"NRORA Customer")+". Share only the link shown below."; $("total").textContent=info.successful;$("year").textContent=info.thisYear+" / "+info.annualTarget;$("progress").style.width=Math.min(100,info.thisYear/info.annualTarget*100)+"%";$("shareLink").textContent=link.shareLink;$("dashboard").classList.remove("hidden");$("loginForm").classList.add("hidden");$("status").style.display="none"}
+$("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginBtn").disabled=true;status("Verifying your registered customer details…","success");try{const d=await api("customer-login","POST",{phone:$("phone").value.replace(/\D/g,""),vehicle_no:$("vehicle").value.trim().toUpperCase(),chassis_number:$("chassis").value.trim().toUpperCase()});customerToken=d.token;localStorage.setItem("nrora_customer_token",customerToken);await loadDashboard()}catch(err){customerToken="";localStorage.removeItem("nrora_customer_token");status(err.message)}finally{$("loginBtn").disabled=false}});
+$("copyBtn").addEventListener("click",async()=>{try{await navigator.clipboard.writeText($("shareLink").textContent);status("Referral link copied. Share it with a new customer.","success")}catch{status("Please select and copy the referral link manually.","error")}});
+$("shareBtn").addEventListener("click",async()=>{const url=$("shareLink").textContent;try{if(navigator.share)await navigator.share({title:"NRORA Road Assistance",text:"Register for NRORA Road Assistance using my referral link.",url});else{await navigator.clipboard.writeText(url);status("Referral link copied. You can now share it.","success")}}catch(e){if(e.name!=="AbortError")status("Unable to open sharing on this device. Please copy the link.","error")}});
+$("logoutBtn").addEventListener("click",()=>{customerToken="";localStorage.removeItem("nrora_customer_token");$("dashboard").classList.add("hidden");$("loginForm").classList.remove("hidden");$("phone").value="";$("vehicle").value="";$("chassis").value="";status("You have logged out.","success")});
+if(customerToken)loadDashboard().catch(e=>{customerToken="";localStorage.removeItem("nrora_customer_token");status(e.message)});
+</script></body></html>

@@ -95,7 +95,8 @@ async function login(req, res) {
        from customers c
       where regexp_replace(c.phone,'[^0-9]','','g')=$1
         and (
-          regexp_replace(upper(c.vehicle_no),'[^A-Z0-9]','','g')=$2
+          (regexp_replace(upper(c.vehicle_no),'[^A-Z0-9]','','g')=$2
+           and regexp_replace(upper(c.chassis_number),'[^A-Z0-9]','','g')=$3)
           or exists (
             select 1 from customer_vehicles cv
              where cv.customer_id=c.id

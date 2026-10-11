@@ -10,6 +10,7 @@ export default defineConfig({
         main: resolve(__dirname, "index.html"),
         register: resolve(__dirname, "register.html"),
         customerRegister: resolve(__dirname, "customer-register.html"),
+        customerLogin: resolve(__dirname, "customer-login.html"),
         requests: resolve(__dirname, "requests.html"),
         contact: resolve(__dirname, "contact.html"),
         ceo: resolve(__dirname, "ceo.html")

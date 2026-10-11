@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b2d5c">
+<title>NRORA Sales Executive Application | NR Group of Companies</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f1f6fc;color:#152b49;font-family:Arial,Helvetica,sans-serif}.wrap{max-width:780px;margin:24px auto;padding:14px}.card{background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 10px 32px #0b2d5c1c}.hero{padding:25px;background:linear-gradient(120deg,#082c5b,#1670d8);color:#fff}.brand{font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;opacity:.95}.hero h1{font-size:29px;margin:14px 0 7px}.hero p{margin:0;line-height:1.55}.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.chip{background:#ffffff1c;border:1px solid #ffffff55;border-radius:20px;padding:7px 10px;font-size:12px;font-weight:700}.body{padding:22px}.note{padding:12px 14px;border-radius:10px;background:#edf5ff;color:#234c7e;line-height:1.5;font-size:13px;margin-bottom:18px}.section{border:1px solid #d8e4f1;border-radius:13px;padding:16px;margin-bottom:15px}.section h2{font-size:16px;margin:0 0 14px;color:#0b3b76}.grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.field{display:grid;gap:6px;font-size:12px;font-weight:800;color:#52677f}.full{grid-column:1/-1}input,select,textarea{width:100%;padding:12px;border:1px solid #c9d7e7;border-radius:9px;background:#fff;font:16px Arial;color:#172b45}textarea{min-height:90px;resize:vertical}.required{color:#c62828}.checks{display:grid;gap:10px;font-size:14px;line-height:1.45}.checks label{display:flex;align-items:flex-start;gap:9px}.checks input{width:18px;height:18px;margin-top:1px;flex-shrink:0}.btn{display:block;width:100%;border:0;border-radius:11px;padding:15px;background:#0b55b5;color:#fff;font-size:16px;font-weight:800;cursor:pointer}.help{font-size:12px;color:#64778e;line-height:1.5;margin:12px 0 0}.footer{padding:17px 22px;background:#082c5b;color:#fff;font-size:13px;line-height:1.7}.footer a{color:#fff;font-weight:700}@media(max-width:600px){.wrap{padding:6px;margin:8px auto}.hero{padding:19px}.hero h1{font-size:24px}.body{padding:12px}.section{padding:12px}.grid{grid-template-columns:1fr}.full{grid-column:auto}.footer{padding:15px}}
+</style>
+</head>
+<body><main class="wrap"><div class="card">
+<header class="hero"><div class="brand">NR Group of Companies · NRORA Road Assistance</div><h1>Sales Executive Application</h1><p>Apply to join our roadside-assistance membership sales team.</p><div class="chips"><span class="chip">Age 18–35</span><span class="chip">12th Pass or above</span><span class="chip">Salary ₹15,000–₹20,000 + incentives*</span><span class="chip">Nizamabad & surrounding areas</span></div></header>
+<div class="body">
+<div class="note"><strong>Important:</strong> Good communication in all three languages—English, Telugu and Hindi—is mandatory. NRORA provides roadside assistance only for eligible cars/four-wheelers; bikes/two-wheelers and commercial vehicles are not covered.</div>
+<form id="application">
+<section class="section"><h2>1. Personal Details</h2><div class="grid">
+<label class="field">FULL NAME <span class="required">*</span><input name="name" required autocomplete="name" maxlength="100" placeholder="Enter your full name"></label>
+<label class="field">MOBILE NUMBER <span class="required">*</span><input name="phone" required type="tel" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="10-digit mobile number"></label>
+<label class="field">EMAIL ADDRESS <input name="email" type="email" autocomplete="email" maxlength="150" placeholder="name@example.com"></label>
+<label class="field">AGE <span class="required">*</span><input name="age" type="number" required min="18" max="35" placeholder="18–35"></label>
+<label class="field">CURRENT LOCATION / TOWN <span class="required">*</span><input name="location" required maxlength="150" placeholder="Town, district"></label>
+<label class="field">EDUCATION <span class="required">*</span><select name="education" required><option value="">Select education</option><option>12th Pass</option><option>Diploma</option><option>Graduate</option><option>Postgraduate</option><option>Other</option></select></label>
+</div></section>
+<section class="section"><h2>2. Language Skills — All Three Are Mandatory</h2><div class="checks">
+<label><input type="checkbox" name="english" required> I can communicate professionally in English.</label>
+<label><input type="checkbox" name="telugu" required> I can communicate fluently in Telugu.</label>
+<label><input type="checkbox" name="hindi" required> I can communicate fluently in Hindi.</label>
+</div><p class="help">Please tick all three only if you meet each requirement.</p></section>
+<section class="section"><h2>3. Work Details</h2><div class="grid">
+<label class="field">EXPERIENCE <span class="required">*</span><select name="experience" required><option value="">Select experience</option><option>Fresher</option><option>Less than 1 year</option><option>1–3 years</option><option>More than 3 years</option></select></label>
+<label class="field">SMARTPHONE & INTERNET ACCESS <span class="required">*</span><select name="smartphone" required><option value="">Select</option><option>Yes</option><option>No</option></select></label>
+<label class="field full">PREVIOUS SALES / CUSTOMER SERVICE EXPERIENCE (IF ANY)<textarea name="details" maxlength="1200" placeholder="Briefly describe your experience and relevant skills"></textarea></label>
+</div></section>
+<section class="section"><h2>4. Confirmations</h2><div class="checks">
+<label><input type="checkbox" name="fieldwork" required> I am willing to visit customers and travel locally for sales work.</label>
+<label><input type="checkbox" name="truth" required> I confirm that the details provided are correct and agree to be contacted about this application.</label>
+</div></section>
+<button class="btn" type="submit">Prepare & Send Application</button>
+<p class="help">When you submit, your email app will open with your application details addressed to our recruitment team. Please review and press Send in your email app; the application is not submitted until you send that email.</p>
+<div id="status" class="help" role="status" aria-live="polite"></div>
+</form>
+</div>
+<footer class="footer"><strong>NR Group of Companies</strong><br>Nagole, Hyderabad, Telangana<br>Recruitment: <a href="mailto:career@nrgroupofcompanies.in">career@nrgroupofcompanies.in</a><br>Phone: <a href="tel:+919000264439">9000264439</a><br><small>*Salary and incentives are subject to final company policy and offer.</small></footer>
+</div></main>
+<script>
+const form=document.getElementById('application');
+form.addEventListener('submit',function(e){e.preventDefault();if(!form.reportValidity())return;const fd=new FormData(form);const fields=[['Full Name','name'],['Mobile Number','phone'],['Email','email'],['Age','age'],['Location','location'],['Education','education'],['English','english'],['Telugu','telugu'],['Hindi','hindi'],['Experience','experience'],['Smartphone & Internet','smartphone'],['Previous Experience','details'],['Willing to Travel','fieldwork']];const lines=fields.map(([label,key])=>label+': '+(fd.get(key)==='on'?'Yes':(fd.get(key)||'Not provided')));lines.push('Confirmation: Candidate confirms details are correct and agrees to be contacted.');const subject=encodeURIComponent('NRORA Sales Executive Application - '+fd.get('name'));const body=encodeURIComponent(lines.join('\n'));document.getElementById('status').textContent='Opening your email app. Please review the application and press Send to submit it.';window.location.href='mailto:career@nrgroupofcompanies.in?subject='+subject+'&body='+body;});
+</script></body></html>

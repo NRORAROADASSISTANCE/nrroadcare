@@ -25,8 +25,9 @@ button:disabled{opacity:.6;cursor:wait}.wide{width:100%;margin-top:16px}
 <form id="loginForm"><div class="login-grid">
 <label>REGISTERED MOBILE NUMBER<input id="phone" inputmode="numeric" autocomplete="tel" maxlength="10" pattern="[0-9]{10}" required placeholder="10-digit mobile number"></label>
 <label>REGISTERED VEHICLE NUMBER<input id="vehicle" autocapitalize="characters" autocomplete="off" maxlength="20" required placeholder="e.g. TS09AB1234"></label>
+<label>REGISTERED CHASSIS NUMBER<input id="chassis" autocapitalize="characters" autocomplete="off" minlength="5" maxlength="30" required placeholder="Chassis number from RC"></label>
 </div><button id="loginBtn" class="wide" type="submit">Login to Customer Panel</button><div id="loginMessage" class="message" role="status" aria-live="polite"></div>
-<p class="note">Enter the same mobile number and vehicle registration number used during NRORA registration. No password required.</p></form></div></section>
+<p class="note">Enter the same mobile number, vehicle registration number and chassis number used during NRORA registration.</p></form></div></section>
 <section id="dashboardCard" class="card hidden"><div class="hero"><div class="toprow"><div><h1>My NRORA Dashboard</h1><p id="welcome">Welcome back.</p></div><button id="logoutBtn" class="logout" type="button">Logout</button></div></div><div class="pad">
 <div class="toprow"><h2>My Membership</h2><span id="accountStatus" class="status">Checking status…</span></div>
 <div class="tiles">
@@ -53,14 +54,14 @@ async function loadDashboard(){
  $("welcome").textContent="Welcome, "+data.customer.name;
  const state=String(data.customer.account_status||"inactive");
  $("accountStatus").textContent=state.replace(/_/g," ").toUpperCase();
- $("profile").innerHTML='<div class="item"><b>Name</b><br>'+esc(data.customer.name)+'</div><div class="item"><b>Mobile</b><br>'+esc(data.customer.phone)+'</div><div class="item"><b>Address</b><br>'+esc(data.customer.address||"Not provided")+'</div>';
+ $("profile").innerHTML='<div class="item"><b>Name</b><br>'+esc(data.customer.name)+'</div><div class="item"><b>Mobile</b><br>'+esc(data.customer.phone)+'</div><div class="item"><b>Address</b><br>'+esc(data.customer.address||"Not provided")+'</div><div class="item"><b>Chassis Number</b><br>'+esc(data.customer.chassis_number||"—")+'</div>';
  list("membership",data.memberships||[],m=>'<div class="item"><span class="big">'+money(m.amount)+'</span><br><b>Renewal date:</b> '+date(m.renewal_date)+'<br><span class="muted">Yearly membership</span></div>',state==="active"?"No membership record found yet.":"Membership is pending activation after payment verification.");
  list("vehicles",data.vehicles||[],v=>'<div class="item"><b>'+esc(v.vehicle_no)+'</b><br>'+esc([v.make_brand,v.model,v.variant,v.vehicle_type].filter(Boolean).join(" · ")||"Registered vehicle")+'</div>',"No vehicle details found.");
  list("payments",data.payments||[],p=>'<div class="item"><b>'+money(p.amount)+'</b> · '+esc(String(p.status||"unknown").replace(/_/g," "))+'<br><span class="muted">'+esc(p.method||"")+' · '+date(p.paid_at)+'</span></div>',"No payment records found.");
  list("requests",data.serviceRequests||[],r=>'<div class="item"><b>Request #'+esc(r.id)+'</b> · '+esc(r.status||"pending")+'<br>'+esc(r.description||"Road assistance request")+'<br><span class="muted">'+date(r.created_at)+'</span></div>',"No service requests yet.");
 }
 $("loginForm").addEventListener("submit",async e=>{e.preventDefault();const btn=$("loginBtn");btn.disabled=true;btn.textContent="Verifying…";showMessage("Checking your registered details…","success");
- try{const response=await fetch("/api/customer-panel?action=login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone:$("phone").value,vehicle_no:$("vehicle").value})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Login failed.");customerToken=data.token;await loadDashboard()}
+ try{const response=await fetch("/api/customer-panel?action=login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone:$("phone").value,vehicle_no:$("vehicle").value,chassis_number:$("chassis").value})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Login failed.");customerToken=data.token;await loadDashboard()}
  catch(error){showMessage(error.message||"Login failed. Please try again.","error")}
  finally{btn.disabled=false;btn.textContent="Login to Customer Panel"}
 });

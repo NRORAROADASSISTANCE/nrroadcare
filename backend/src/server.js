@@ -147,7 +147,7 @@ async function finalizeCapturedPayment({orderId,paymentId,amount,method="UPI",tr
   const active=await pool.query("select id from memberships where customer_id=$1 and renewal_date>=current_date order by renewal_date desc limit 1",[current.customer_id]);
   if(!active.rowCount){
     const plan = membershipPlan(current.plan_code) || MEMBERSHIP_PLANS.standard;
-    const baseAmount = Number(current.base_amount || plan.baseAmount);
+    const baseAmount = Number(current.base_amount || current.amount || plan.baseAmount);
     await pool.query("insert into memberships(customer_id,amount,renewal_date,plan_code,service_limit,services_used) values($1,$2,(current_date + interval '1 year')::date,$3,$4,0)",[current.customer_id,baseAmount,plan.code,Number(current.service_limit || plan.serviceLimit)]);
   }
   await pool.query("update customers set account_status='active',mobile_verified=true,membership_start=current_date,membership_end=(current_date + interval '1 year')::date where id=$1",[current.customer_id]);

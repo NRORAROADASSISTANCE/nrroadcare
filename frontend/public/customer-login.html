@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0755b8"><title>NRORA Customer Login</title>
+<style>
+:root{--blue:#075be8;--navy:#10264a;--muted:#61738b;--line:#dce8f6}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#edf6ff,#f8fbff);font-family:Inter,Arial,sans-serif;color:var(--navy)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo{width:160px;height:80px;object-fit:contain;object-position:left center}a{color:var(--blue);font-weight:750;text-decoration:none}
+main{width:min(1000px,calc(100% - 28px));margin:26px auto 60px}
+.card{background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 18px 50px #173e7014;overflow:hidden}
+.hero{padding:25px 28px;background:linear-gradient(120deg,#0b2d5c,#1464df);color:#fff}.hero h1{margin:0 0 7px;font-size:28px}.hero p{margin:0;opacity:.9;line-height:1.5}
+.pad{padding:24px 28px}.login-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+label{display:grid;gap:7px;font-size:12px;font-weight:800;color:#4b607b}
+input{width:100%;padding:14px;border:1px solid #cbd8e7;border-radius:11px;font-size:16px;outline:none}
+input:focus{border-color:var(--blue);box-shadow:0 0 0 3px #075be81c}
+button,.btn{display:inline-flex;justify-content:center;align-items:center;border:0;border-radius:11px;background:linear-gradient(120deg,#1298f5,#0753e5);color:#fff;font-weight:850;padding:14px 20px;font-size:14px;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}.wide{width:100%;margin-top:16px}
+.note{font-size:12px;color:var(--muted);line-height:1.55;margin:14px 0 0}.message{display:none;padding:12px 14px;border-radius:10px;margin-top:14px;font-size:13px}.error{display:block;background:#fff0f0;color:#a51e2b}.success{display:block;background:#eaf9f1;color:#087f5b}
+.hidden{display:none!important}.toprow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.toprow h2{margin:0;font-size:24px}.status{display:inline-block;border-radius:99px;padding:7px 11px;background:#e7f0ff;color:#1756b7;font-size:12px;font-weight:850}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}.tile{border:1px solid var(--line);border-radius:15px;padding:17px;min-width:0}.tile h3{font-size:14px;margin:0 0 12px}.item{padding:12px 0;border-top:1px solid #edf1f7;font-size:13px;line-height:1.5;overflow-wrap:anywhere}.item:first-of-type{border-top:0}.muted{color:var(--muted)}.big{font-size:22px;font-weight:900;color:#075be8}.empty{font-size:13px;color:var(--muted);padding:8px 0}.logout{background:#edf3fb;color:#17345d}
+@media(max-width:650px){header{padding:8px 14px}.logo{width:120px;height:60px}main{margin:14px auto 35px}.hero{padding:21px}.hero h1{font-size:24px}.pad{padding:18px}.login-grid,.tiles{grid-template-columns:1fr}.toprow h2{font-size:21px}}
+</style></head>
+<body><header><a href="/" aria-label="NRORA home"><img class="logo" src="/nrora-3d-small.jpg" alt="NRORA Road Assistance"></a><a href="/register">New Customer? Register</a></header>
+<main>
+<section id="loginCard" class="card"><div class="hero"><h1>Customer Login</h1><p>Access your NRORA membership and roadside assistance details.</p></div><div class="pad">
+<form id="loginForm"><div class="login-grid">
+<label>REGISTERED MOBILE NUMBER<input id="phone" inputmode="numeric" autocomplete="tel" maxlength="10" pattern="[0-9]{10}" required placeholder="10-digit mobile number"></label>
+<label>REGISTERED VEHICLE NUMBER<input id="vehicle" autocapitalize="characters" autocomplete="off" maxlength="20" required placeholder="e.g. TS09AB1234"></label>
+</div><button id="loginBtn" class="wide" type="submit">Login to Customer Panel</button><div id="loginMessage" class="message" role="status" aria-live="polite"></div>
+<p class="note">Enter the same mobile number and vehicle registration number used during NRORA registration. No password required.</p></form></div></section>
+<section id="dashboardCard" class="card hidden"><div class="hero"><div class="toprow"><div><h1>My NRORA Dashboard</h1><p id="welcome">Welcome back.</p></div><button id="logoutBtn" class="logout" type="button">Logout</button></div></div><div class="pad">
+<div class="toprow"><h2>My Membership</h2><span id="accountStatus" class="status">Checking status…</span></div>
+<div class="tiles">
+<div class="tile"><h3>Customer Profile</h3><div id="profile"></div></div>
+<div class="tile"><h3>Membership Validity</h3><div id="membership"></div></div>
+<div class="tile"><h3>Registered Vehicles</h3><div id="vehicles"></div></div>
+<div class="tile"><h3>Payment Details</h3><div id="payments"></div></div>
+<div class="tile" style="grid-column:1/-1"><h3>Service Requests</h3><div id="requests"></div></div>
+</div><p class="note">For urgent roadside assistance, use the contact details on the NRORA website. Keep your login details private.</p></div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let customerToken="";
+function showMessage(text,type){const el=$("loginMessage");el.textContent=text;el.className="message "+type}
+function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]))}
+function date(value){if(!value)return "—";const d=new Date(value);return Number.isNaN(d.getTime())?esc(value):d.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}
+function money(value){return "₹"+Number(value||0).toLocaleString("en-IN",{maximumFractionDigits:2})}
+function list(container,items,render,emptyText){$(container).innerHTML=items.length?items.map(render).join(""):'<div class="empty">'+esc(emptyText)+'</div>'}
+async function loadDashboard(){
+ const response=await fetch("/api/customer-panel?action=dashboard",{headers:{Authorization:"Bearer "+customerToken}});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error(data.error||"Unable to load dashboard.");
+ $("loginCard").classList.add("hidden");$("dashboardCard").classList.remove("hidden");
+ $("welcome").textContent="Welcome, "+data.customer.name;
+ const state=String(data.customer.account_status||"inactive");
+ $("accountStatus").textContent=state.replace(/_/g," ").toUpperCase();
+ $("profile").innerHTML='<div class="item"><b>Name</b><br>'+esc(data.customer.name)+'</div><div class="item"><b>Mobile</b><br>'+esc(data.customer.phone)+'</div><div class="item"><b>Address</b><br>'+esc(data.customer.address||"Not provided")+'</div>';
+ list("membership",data.memberships||[],m=>'<div class="item"><span class="big">'+money(m.amount)+'</span><br><b>Renewal date:</b> '+date(m.renewal_date)+'<br><span class="muted">Yearly membership</span></div>',state==="active"?"No membership record found yet.":"Membership is pending activation after payment verification.");
+ list("vehicles",data.vehicles||[],v=>'<div class="item"><b>'+esc(v.vehicle_no)+'</b><br>'+esc([v.make_brand,v.model,v.variant,v.vehicle_type].filter(Boolean).join(" · ")||"Registered vehicle")+'</div>',"No vehicle details found.");
+ list("payments",data.payments||[],p=>'<div class="item"><b>'+money(p.amount)+'</b> · '+esc(String(p.status||"unknown").replace(/_/g," "))+'<br><span class="muted">'+esc(p.method||"")+' · '+date(p.paid_at)+'</span></div>',"No payment records found.");
+ list("requests",data.serviceRequests||[],r=>'<div class="item"><b>Request #'+esc(r.id)+'</b> · '+esc(r.status||"pending")+'<br>'+esc(r.description||"Road assistance request")+'<br><span class="muted">'+date(r.created_at)+'</span></div>',"No service requests yet.");
+}
+$("loginForm").addEventListener("submit",async e=>{e.preventDefault();const btn=$("loginBtn");btn.disabled=true;btn.textContent="Verifying…";showMessage("Checking your registered details…","success");
+ try{const response=await fetch("/api/customer-panel?action=login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone:$("phone").value,vehicle_no:$("vehicle").value})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Login failed.");customerToken=data.token;await loadDashboard()}
+ catch(error){showMessage(error.message||"Login failed. Please try again.","error")}
+ finally{btn.disabled=false;btn.textContent="Login to Customer Panel"}
+});
+$("logoutBtn").addEventListener("click",()=>{customerToken="";$("dashboardCard").classList.add("hidden");$("loginCard").classList.remove("hidden");$("loginForm").reset();$("loginMessage").className="message";});
+</script></body></html>

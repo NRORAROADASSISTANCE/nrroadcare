@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0755b8">
+<title>NRORA | FAQs</title>
+<style>
+:root{--blue:#075be8;--navy:#0c2146;--muted:#52647d;--line:#dce8f6}
+*{box-sizing:border-box}body{margin:0;background:#f4f8ff;color:var(--navy);font-family:Inter,Arial,sans-serif}
+header{position:sticky;top:0;background:#ffffffed;backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;z-index:2}
+.brand{font-size:19px;font-weight:900;color:var(--navy)}.close{border:0;border-radius:11px;background:#075be8;color:white;font-weight:800;padding:12px 17px;font-size:14px;cursor:pointer}
+main{width:min(900px,calc(100% - 30px));margin:34px auto 55px}h1{font-size:clamp(30px,5vw,42px);margin:0 0 10px;letter-spacing:-1px}.intro{color:var(--muted);line-height:1.6;margin:0 0 24px}
+.faq-list{display:grid;gap:12px}.faq-item{background:white;border:1px solid var(--line);border-radius:15px;overflow:hidden;box-shadow:0 8px 22px #142d5a08}
+summary{cursor:pointer;list-style:none;padding:19px 54px 19px 20px;font-size:16px;font-weight:800;position:relative}summary::-webkit-details-marker{display:none}
+summary:after{content:"+";position:absolute;right:20px;top:50%;transform:translateY(-50%);font-size:24px;color:var(--blue)}details[open] summary:after{content:"−"}
+.answer{padding:0 20px 20px;color:var(--muted);line-height:1.7}
+.bottom{text-align:center;margin-top:26px;color:var(--muted);font-size:14px}.bottom a{color:var(--blue);font-weight:800}
+</style>
+</head>
+<body>
+<header><div class="brand">NRORA · FAQs</div><button class="close" onclick="closeFaq()">✕ Close</button></header>
+<main>
+<h1>Frequently Asked Questions</h1>
+<p class="intro">Quick answers about NRORA membership and roadside assistance.</p>
+<div class="faq-list">
+<details class="faq-item"><summary>Which vehicles are eligible for NRORA?</summary><div class="answer">NRORA membership is for eligible private cars and four-wheelers only. Bikes, scooters, two-wheelers and commercial vehicles are not covered.</div></details>
+<details class="faq-item"><summary>What are the membership prices?</summary><div class="answer">Standard membership is ₹4,999 per year for up to 3 eligible roadside assistance requests. Pro membership is ₹6,999 per year for up to 5 eligible requests. Membership validity is 12 months from activation.</div></details>
+<details class="faq-item"><summary>When can I start using the service?</summary><div class="answer">Service eligibility begins after payment is successfully verified and your membership is activated. Please wait for activation confirmation before requesting service.</div></details>
+<details class="faq-item"><summary>What roadside services can I request?</summary><div class="answer">Depending on the situation and service availability, eligible requests may include battery jump-start, flat-tyre assistance, basic on-spot mechanical help, key-lockout assistance and towing/recovery coordination.</div></details>
+<details class="faq-item"><summary>Are spare parts and towing charges included?</summary><div class="answer">No. Spare parts, garage repair bills, towing/vehicle transport and third-party charges are generally payable by the customer. Confirm any applicable charges before authorizing extra work.</div></details>
+<details class="faq-item"><summary>Can I get a refund or reimbursement if I arrange my own mechanic?</summary><div class="answer">Please contact NRORA before arranging outside help. Costs incurred without NRORA's approval are not automatically reimbursed. Membership refund requests are handled under the Terms &amp; Conditions and applicable law.</div></details>
+<details class="faq-item"><summary>Do unused service requests carry forward?</summary><div class="answer">No. Unused requests expire when the 12-month membership period ends and do not carry forward to the next year.</div></details>
+<details class="faq-item"><summary>Is NRORA an insurance or accident-compensation plan?</summary><div class="answer">No. NRORA provides roadside assistance; it is not motor insurance and does not provide accident compensation.</div></details>
+<details class="faq-item"><summary>What should I do if I need assistance?</summary><div class="answer">Use the NRORA customer/service channel and provide your registered mobile number, vehicle details and current location so the team can check your membership and coordinate eligible assistance.</div></details>
+</div>
+<div class="bottom"><a href="/terms-and-conditions.html">Read Terms &amp; Conditions</a></div>
+</main>
+<script>
+function closeFaq(){if(document.referrer && new URL(document.referrer).origin===location.origin){history.back()}else{location.href="/public-site.html"}}
+</script>
+</body></html>

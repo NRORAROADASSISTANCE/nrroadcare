@@ -13,7 +13,7 @@ globalThis.__nroraCustomerPanelPool = pool;
 const SECRET = process.env.SESSION_SECRET || process.env.DATABASE_URL;
 const json = (res, status, body) => res.status(status).json(body);
 const clean = v => String(v ?? "").trim();
-const phoneDigits = v => clean(v).replace(/\\D/g, "");
+const phoneDigits = v => clean(v).replace(/\D/g, "");
 const vehicleKey = v => clean(v).toUpperCase().replace(/[^A-Z0-9]/g, "");
 const requestIp = req => String(req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "unknown").split(",")[0].trim();
 const ipHash = req => crypto.createHash("sha256").update(requestIp(req) + "|" + String(SECRET || "")).digest("hex");
@@ -109,7 +109,7 @@ async function login(req, res) {
   return json(res, 200, { ok: true, token: issueToken(found.rows[0].id), customer: { name: found.rows[0].name } });
 }
 async function dashboard(req, res) {
-  const auth = String(req.headers.authorization || "").replace(/^Bearer\\s+/i, "");
+  const auth = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   const session = readToken(auth);
   if (!session) return json(res, 401, { error: "Your session expired. Please login again." });
   const customerId = Number(session.customerId);

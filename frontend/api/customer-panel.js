@@ -20,6 +20,7 @@ const ipHash = req => crypto.createHash("sha256").update(requestIp(req) + "|" + 
 
 async function ensureSchema() {
   await pool.query(`
+    alter table customers add column if not exists chassis_number varchar(40) not null default '';
     create table if not exists customer_panel_login_attempts(
       ip_hash varchar(64) primary key,
       failed_count integer not null default 0,
@@ -30,6 +31,7 @@ async function ensureSchema() {
       id bigserial primary key,
       customer_id bigint not null references customers(id) on delete cascade,
       vehicle_no varchar(30) not null,
+      chassis_number varchar(40) not null default '',
       vehicle_type varchar(60) not null default '',
       make_brand varchar(100) not null default '',
       model varchar(100) not null default '',
@@ -42,6 +44,7 @@ async function ensureSchema() {
       photo2 text not null default '',
       created_at timestamptz default now()
     );
+    alter table customer_vehicles add column if not exists chassis_number varchar(40) not null default '';
   `);
 }
 function issueToken(customerId) {
@@ -80,14 +83,15 @@ async function failedLogin(req) {
 async function login(req, res) {
   const phone = phoneDigits(req.body?.phone);
   const vehicle = vehicleKey(req.body?.vehicle_no);
-  if (phone.length !== 10 || vehicle.length < 5) return json(res, 400, { error: "Enter your registered 10-digit mobile number and vehicle number." });
+  const chassis = vehicleKey(req.body?.chassis_number);
+  if (phone.length !== 10 || vehicle.length < 5 || chassis.length < 5 || chassis.length > 30) return json(res, 400, { error: "Enter your registered 10-digit mobile number, vehicle number and chassis number." });
   const key = ipHash(req);
   const attempts = await pool.query("select locked_until from customer_panel_login_attempts where ip_hash=$1", [key]);
   if (attempts.rows[0]?.locked_until && new Date(attempts.rows[0].locked_until) > new Date()) {
     return json(res, 429, { error: "Too many attempts. Please wait 15 minutes and try again." });
   }
   const found = await pool.query(
-    `select c.id,c.name,c.phone,c.address,c.vehicle_no,c.account_status,c.created_at
+    `select c.id,c.name,c.phone,c.address,c.vehicle_no,c.chassis_number,c.account_status,c.created_at
        from customers c
       where regexp_replace(c.phone,'[^0-9]','','g')=$1
         and (
@@ -96,10 +100,11 @@ async function login(req, res) {
             select 1 from customer_vehicles cv
              where cv.customer_id=c.id
                and regexp_replace(upper(cv.vehicle_no),'[^A-Z0-9]','','g')=$2
+               and regexp_replace(upper(cv.chassis_number),'[^A-Z0-9]','','g')=$3
           )
         )
       order by c.id desc limit 1`,
-    [phone, vehicle]
+    [phone, vehicle, chassis]
   );
   if (!found.rowCount) {
     const result = await failedLogin(req);
@@ -114,21 +119,21 @@ async function dashboard(req, res) {
   if (!session) return json(res, 401, { error: "Your session expired. Please login again." });
   const customerId = Number(session.customerId);
   const customerQ = await pool.query(
-    "select id,name,phone,address,vehicle_no,account_status,created_at from customers where id=$1",
+    "select id,name,phone,address,vehicle_no,chassis_number,account_status,created_at from customers where id=$1",
     [customerId]
   );
   if (!customerQ.rowCount) return json(res, 401, { error: "Customer account not found. Please login again." });
   const [vehiclesQ, membershipsQ, paymentsQ, requestsQ] = await Promise.all([
-    pool.query("select vehicle_no,vehicle_type,make_brand,model,variant from customer_vehicles where customer_id=$1 order by id desc", [customerId]),
+    pool.query("select vehicle_no,chassis_number,vehicle_type,make_brand,model,variant from customer_vehicles where customer_id=$1 order by id desc", [customerId]),
     pool.query("select amount,renewal_date,created_at from memberships where customer_id=$1 order by renewal_date desc limit 5", [customerId]),
     pool.query("select amount,method,status,paid_at,transaction_ref from payments where customer_id=$1 order by id desc limit 5", [customerId]),
     pool.query("select id,status,location,description,created_at from service_requests where customer_id=$1 order by id desc limit 10", [customerId])
   ]);
   const c = customerQ.rows[0];
-  const vehicles = vehiclesQ.rows.length ? vehiclesQ.rows : [{ vehicle_no: c.vehicle_no, vehicle_type: "", make_brand: "", model: "", variant: "" }];
+  const vehicles = vehiclesQ.rows.length ? vehiclesQ.rows : [{ vehicle_no: c.vehicle_no, chassis_number: c.chassis_number, vehicle_type: "", make_brand: "", model: "", variant: "" }];
   return json(res, 200, {
     ok: true,
-    customer: { name: c.name, phone: c.phone, address: c.address, account_status: c.account_status, created_at: c.created_at },
+    customer: { name: c.name, phone: c.phone, address: c.address, chassis_number: c.chassis_number, account_status: c.account_status, created_at: c.created_at },
     vehicles,
     memberships: membershipsQ.rows,
     payments: paymentsQ.rows.map(p => ({ amount: p.amount, method: p.method, status: p.status, paid_at: p.paid_at, transaction_ref: p.transaction_ref })),

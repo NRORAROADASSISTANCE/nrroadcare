@@ -31,10 +31,11 @@ $("loginForm").addEventListener("submit",async e=>{
   const data=await res.json().catch(()=>({}));
   if(!res.ok||!data.token||!data.user)throw new Error(data.error||"Login verification failed. Please check your details.");
   const role=String(data.user.role||"").toLowerCase();
+  if(role==="ceo")throw new Error("CEO access is separate. Please use your existing CEO login link: /ceo.html");
   if(!roleNames[role])throw new Error("Your account has no valid designation. Contact NRORA management.");
   sessionStorage.setItem("nrora_token",data.token);
-  if(role==="ceo"){sessionStorage.setItem("nrora_ceo_token",data.token);destination="/?ceo=1#/";}
-  else{sessionStorage.removeItem("nrora_ceo_token");destination=role==="mechanic"?"/mechanic-orders.html":"/?office=1#/";}
+  sessionStorage.removeItem("nrora_ceo_token");
+  destination=role==="mechanic"?"/mechanic-orders.html":"/?office=1#/";
   $("roleBadge").textContent=roleNames[role];
   $("welcome").textContent="Welcome, "+String(data.user.name||data.user.username||"NRORA team member")+".";
   $("verified").classList.add("show");showMessage("Login successful. Designation verified.","success");

@@ -17,16 +17,17 @@ const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || "";
 const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET || "";
 const GST_RATE = 18;
 const MEMBERSHIP_PLANS = {
-  standard: { code: "standard", name: "Standard", baseAmount: 4999, serviceLimit: 3 },
-  pro: { code: "pro", name: "Pro", baseAmount: 6999, serviceLimit: 5 }
+  standard: { code: "standard", name: "Standard", amount: 4999, serviceLimit: 3 },
+  pro: { code: "pro", name: "Pro", amount: 6999, serviceLimit: 5 }
 };
 function membershipPlan(code) {
   return MEMBERSHIP_PLANS[String(code || "standard").toLowerCase()] || null;
 }
 function membershipPrice(plan) {
-  const basePaise = plan.baseAmount * 100;
-  const gstPaise = Math.round(basePaise * GST_RATE / 100);
-  return { baseAmount: plan.baseAmount, gstAmount: gstPaise / 100, gstRate: GST_RATE, totalAmount: (basePaise + gstPaise) / 100, totalPaise: basePaise + gstPaise };
+  const totalPaise = plan.amount * 100;
+  const gstPaise = Math.round(totalPaise * GST_RATE / (100 + GST_RATE));
+  const basePaise = totalPaise - gstPaise;
+  return { baseAmount: basePaise / 100, gstAmount: gstPaise / 100, gstRate: GST_RATE, totalAmount: plan.amount, totalPaise };
 }
 
 app.use(cors({ origin: process.env.FRONTEND_ORIGIN?.split(",") || "*" }));

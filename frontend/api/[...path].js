@@ -347,7 +347,7 @@ if(req.method==="GET"&&path==="ceo/security-events"){
   const username=String(req.query?.username||"").trim().slice(0,80);
   const conditions=[],values=[];
   if(event){values.push(event);conditions.push("event=$"+values.length)}
-  if(username){values.push(username);conditions.push("lower(username)=lower($"+values.length))}
+  if(username){values.push(username);conditions.push("lower(username)=lower($" + values.length + ")")}
   values.push(limit);const lp=values.length;values.push(offset);const op=values.length;
   const where=conditions.length?" where "+conditions.join(" and "):"";
   const r=await pool.query("select id,username,event,created_at,details from nrora_auth_events"+where+" order by created_at desc,id desc limit $"+lp+" offset $"+op,values);

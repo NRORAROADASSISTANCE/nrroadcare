@@ -197,7 +197,7 @@ if(req.method==="PATCH"&&parts[0]==="ceo"&&parts[1]==="change-requests"&&parts[2
   if(!target.rowCount)return json(res,404,{error:"Technician not found"});
   const removed=await pool.query("update technicians set active=false where id=$1 returning id",[cr.entity_id]);
   if(!removed.rowCount)return json(res,409,{error:"Technician could not be deactivated"});
-else if(cr.action==="delete"&&cr.entity_type==="employee"){
+}else if(cr.action==="delete"&&cr.entity_type==="employee"){
   const target=await pool.query("select id,role from users where id=$1",[cr.entity_id]);
   if(!target.rowCount)return json(res,404,{error:"Employee not found"});
   if(["ceo","admin"].includes(target.rows[0].role))return json(res,403,{error:"Protected account cannot be deactivated"});

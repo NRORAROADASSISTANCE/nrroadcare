@@ -16,7 +16,7 @@ const ensureDataSafety=async()=>{
       row_data jsonb,
       changed_at timestamptz not null default now()
     )`);
-    await pool.query(`create or replace function nrora_capture_old_row() returns trigger language plpgsql as $
+    await pool.query(`create or replace function nrora_capture_old_row() returns trigger language plpgsql as $$
       begin
         if (tg_op in ('UPDATE','DELETE')) then
           insert into nrora_data_versions(table_name,row_id,operation,row_data)
@@ -24,7 +24,7 @@ const ensureDataSafety=async()=>{
         end if;
         return coalesce(new,old);
       end;
-    $`);
+    $$`);
     for (const table of ["customers","technicians","service_requests","payments","memberships","receipts","users","payment_settings"]) {
       await pool.query(`drop trigger if exists nrora_safety_${table} on ${table}`);
       await pool.query(`create trigger nrora_safety_${table} before update or delete on ${table} for each row execute function nrora_capture_old_row()`);
@@ -62,11 +62,11 @@ async function recordLoginFailure(username,req){
 async function recordLoginSuccess(username,req,role){const h=ipHash(req);await pool.query("delete from nrora_login_attempts where username=$1 and ip_hash=$2",[username,h]);await pool.query("insert into nrora_auth_events(username,event,ip_hash,details) values($1,'login_success',$2,$3)",[username,h,JSON.stringify({role})])}
 async function ensureAuditSchema(){
  await pool.query(`create table if not exists nrora_audit_logs(id bigserial primary key,actor_id bigint,actor_username varchar(80),actor_role varchar(30),action varchar(80) not null,entity_type varchar(50) not null,entity_id text,details jsonb not null default '{}'::jsonb,created_at timestamptz not null default now())`);
- await pool.query(`create or replace function nrora_block_audit_mutation() returns trigger language plpgsql as $
+ await pool.query(`create or replace function nrora_block_audit_mutation() returns trigger language plpgsql as $$
 begin
   raise exception 'Audit logs are immutable';
 end;
-$`);
+    $$`);
  await pool.query("drop trigger if exists nrora_audit_no_update on nrora_audit_logs");
  await pool.query("drop trigger if exists nrora_audit_no_delete on nrora_audit_logs");
  await pool.query("create trigger nrora_audit_no_update before update on nrora_audit_logs for each row execute function nrora_block_audit_mutation()");

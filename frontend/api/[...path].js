@@ -172,7 +172,7 @@ if(req.method==="DELETE"&&path.startsWith("customers/")){
     return json(res,202,{pending:true,message:"Deletion is pending CEO approval.",request:r.rows[0]});
   }
   await cancelPendingForCeo("customer",customerId,u.id);
-  const removed=await pool.query("delete from customers where id=$1 returning id");
+  const removed=await pool.query("delete from customers where id=$1 returning id",[customerId]);
   if(!removed.rowCount)return json(res,404,{error:"Customer not found"});
   await auditDataChange(u,"customer_removed","customer",customerId,snapshot,null,{account_status:snapshot.account_status});
   return json(res,200,{ok:true,pending:false});

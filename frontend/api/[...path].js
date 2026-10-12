@@ -284,6 +284,23 @@ if(req.method==="POST"&&path==="change-requests"){
 }
 if(req.method==="GET"&&path==="ceo/settings"){if(!requireAuth(req,res,["ceo"]))return;const r=await pool.query("select key,value from nrora_settings order by key");return json(res,200,Object.fromEntries(r.rows.map(x=>[x.key,x.value])))}
 if(req.method==="PATCH"&&path==="ceo/settings"){const u=requireAuth(req,res,["ceo"]);if(!u)return;const values=req.body||{};for(const [key,value] of Object.entries(values)){if(typeof value!=="string"&&typeof value!=="number")continue;await pool.query("insert into nrora_settings(key,value,updated_by,updated_at) values($1,$2,$3,now()) on conflict(key) do update set value=excluded.value,updated_by=excluded.updated_by,updated_at=now()",[key,String(value),u.id])}return json(res,200,{ok:true})}
+if(req.method==="GET"&&path==="permissions"){
+  const u=requireAuth(req,res,["ceo"]);if(!u)return;
+  await pool.query("create table if not exists role_permissions(role varchar(30) not null,permission varchar(80) not null,allowed boolean not null default false,updated_at timestamptz default now(),primary key(role,permission))");
+  const r=await pool.query("select role,permission,allowed from role_permissions");
+  const permissions={};for(const row of r.rows){if(!permissions[row.role])permissions[row.role]={};permissions[row.role][row.permission]=row.allowed}
+  return json(res,200,{permissions});
+}
+if(req.method==="PATCH"&&path==="permissions"){
+  const u=requireAuth(req,res,["ceo"]);if(!u)return;
+  const role=String(req.body?.role||"");const permission=String(req.body?.permission||"");const allowed=Boolean(req.body?.allowed);
+  const allowedPermissions=["dashboard_view","requests_view","requests_create","requests_manage","customers_view","customers_create","customers_delete","payments_view","payments_manage","technicians_view","technicians_manage","employees_view","employees_create","employees_manage","workorders_view","workorders_manage","settings_view"];
+  if(!ROLES.includes(role)||!allowedPermissions.includes(permission))return json(res,400,{error:"Invalid role or permission"});
+  await pool.query("create table if not exists role_permissions(role varchar(30) not null,permission varchar(80) not null,allowed boolean not null default false,updated_at timestamptz default now(),primary key(role,permission))");
+  await pool.query("insert into role_permissions(role,permission,allowed,updated_at) values($1,$2,$3,now()) on conflict(role,permission) do update set allowed=excluded.allowed,updated_at=now()",[role,permission,allowed]);
+  await audit(u,"permission_updated","role_permission",role,{permission,allowed});
+  return json(res,200,{ok:true,role,permission,allowed});
+}
 if(req.method==="GET"&&path==="ceo/admins"){if(!requireAuth(req,res,["ceo"]))return;const r=await pool.query("select id,username,name,phone,active,created_at from users where role='admin' order by created_at desc");return json(res,200,r.rows)}
 if(req.method==="POST"&&path==="ceo/admins"){const u=requireAuth(req,res,["ceo"]);if(!u)return;const{name,username,password,phone=""}=req.body||{};if(!name||!username||typeof password!=="string"||password.length<8)return json(res,400,{error:"Name, username and password (minimum 8 characters) are required"});try{const r=await pool.query("insert into users(username,password_hash,role,name,phone,created_by,created_by_username,created_by_role) values($1,$2,'admin',$3,$4,$5,$6,$7) returning id,username,role,name,phone,active,created_by,created_by_username,created_by_role",[username,hash(password),name,phone,u.id,u.username,u.role]);await audit(u,"employee_created","user",r.rows[0].id,{created_role:"admin",name,username,phone});return json(res,201,r.rows[0])}catch(e){if(e.code==="23505")return json(res,409,{error:"Username already exists"});throw e}}
 if(req.method==="PATCH"&&parts[0]==="ceo"&&parts[1]==="admins"&&id){const u=requireAuth(req,res,["ceo"]);if(!u)return;const active=Boolean(req.body?.active);const r=await pool.query("update users set active=$1 where id=$2 and role='admin' returning id,username,name,phone,active",[active,id]);if(!r.rowCount)return json(res,404,{error:"Admin not found"});await audit(u,active?"admin_activated":"admin_deactivated","user",id,{username:r.rows[0].username});return json(res,200,r.rows[0])}

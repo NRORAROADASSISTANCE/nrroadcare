@@ -9,7 +9,7 @@ const pool = globalThis.__nroraLoginPool || new Pool({
 });
 globalThis.__nroraLoginPool = pool;
 
-const SECRET = process.env.SESSION_SECRET || "change-this-session-secret-in-vercel";
+const SECRET = String(process.env.SESSION_SECRET || process.env.DATABASE_URL || "").trim();
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "NRORA@123";
 const CEO_USERNAME = process.env.CEO_USERNAME || "ceo";

@@ -1,7 +1,22 @@
 import pg from "pg";
 import crypto from "crypto";
 const { Pool } = pg;
-const pool = globalThis.__nroraPool || new Pool({ connectionString: process.env.DATABASE_URL, max: 5, idleTimeoutMillis: 10000 });
+function normalizeDatabaseUrl(value) {
+  if (!value) return value;
+  try {
+    const url = new URL(value);
+    const mode = url.searchParams.get("sslmode");
+    // These modes currently have the same effective behavior as verify-full in pg-connection-string.
+    if (["prefer", "require", "verify-ca"].includes(String(mode || "").toLowerCase())) {
+      url.searchParams.set("sslmode", "verify-full");
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
+const pool = globalThis.__nroraPool || new Pool({ connectionString: normalizeDatabaseUrl(process.env.DATABASE_URL), max: 5, idleTimeoutMillis: 10000 });
 globalThis.__nroraPool = pool;
 
 let __nroraSafetyReady=null;

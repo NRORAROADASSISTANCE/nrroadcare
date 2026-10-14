@@ -233,7 +233,7 @@ app.patch("/api/requests/:id",permissionAuth("requests_manage"),asyncRoute(async
   res.json(r.rows[0]||null);
 }));
 
-app.get("/api/mechanics",permissionAuth("technicians_view"),"ceo","admin","division_manager","area_manager","tl","staff","telecaller","employee"]),asyncRoute(async(_req,res)=>{const r=await pool.query("select id,name,phone,alternate_phone,address,specialization,id_number,licence_no,vehicle_type,vehicle_no,experience_years,service_area,joining_date,username,profile_photo,documents,active,created_at from mechanics order by name");res.json(r.rows);}));
+app.get("/api/mechanics",permissionAuth("technicians_view"),asyncRoute(async(_req,res)=>{const r=await pool.query("select id,name,phone,alternate_phone,address,specialization,id_number,licence_no,vehicle_type,vehicle_no,experience_years,service_area,joining_date,username,profile_photo,documents,active,created_at from mechanics order by name");res.json(r.rows);}));
 app.post("/api/mechanics",permissionAuth("technicians_manage"),asyncRoute(async(req,res)=>{
   const {name,phone,alternate_phone="",address="",specialization="",id_number="",licence_no="",vehicle_type="",vehicle_no="",experience_years=0,service_area="",joining_date=null,username,password,profile_photo="",documents=""}=req.body;
   if(!name||!phone||!username||!password)return res.status(400).json({error:"Mechanic name, phone, username and password are required"});

@@ -4,6 +4,11 @@ on:
   push:
     paths-ignore:
       - '.github/workflows/add-customer-mobile-otp-ui.yml'
+      - 'frontend/src/App.jsx'
+      - 'frontend/ceo.html'
+      - 'backend/src/server.js'
+      - 'scripts/patch_ceo_control.py'
+      - 'scripts/patch_customer_ui.py'
 
 permissions:
   contents: write

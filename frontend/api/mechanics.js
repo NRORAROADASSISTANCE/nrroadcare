@@ -8,7 +8,8 @@ const SECRET=String(process.env.SESSION_SECRET||process.env.DATABASE_URL||"").tr
 if(!SECRET||SECRET.length<32)throw new Error("SESSION_SECRET must be configured with at least 32 characters");
 const json=(res,status,body)=>res.status(status).json(body);
 const readToken=t=>{try{const [p,s]=String(t||"").split(".");const u=JSON.parse(Buffer.from(p,"base64url").toString());const e=crypto.createHmac("sha256",SECRET).update(`${u.id}:${u.username}:${u.role}`).digest("hex");if(!s||s.length!==e.length||!crypto.timingSafeEqual(Buffer.from(s),Buffer.from(e))||u.exp<Date.now())return null;return u}catch{return null}};
-const auth=(req,res,roles)=>{const u=readToken((req.headers.authorization||"").replace(/^Bearer\s+/i,""));if(!u||!roles.includes(u.role)){json(res,401,{error:"Unauthorized"});return null}return u};
+const cookieToken=req=>{const m=String(req.headers.cookie||"").match(/(?:^|;\s*)nrora_ceo_token=([^;]+)/);if(!m)return "";try{return decodeURIComponent(m[1])}catch{return ""}};
+const auth=(req,res,roles)=>{const t=(req.headers.authorization||"").replace(/^Bearer\s+/i,"")||cookieToken(req);const u=readToken(t);if(!u||!roles.includes(u.role)){json(res,401,{error:"Unauthorized"});return null}return u};
 async function schema(){
  await pool.query("alter table technicians add column if not exists alternate_phone varchar(20) default ''");
  await pool.query("alter table technicians add column if not exists address text default ''");

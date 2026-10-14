@@ -115,6 +115,7 @@ const requestOrigin=req.headers.origin;
 if(requestOrigin&&allowedOrigins.includes(requestOrigin))res.setHeader("Access-Control-Allow-Origin",requestOrigin);
 res.setHeader("Vary","Origin");
 res.setHeader("Access-Control-Allow-Headers","Content-Type, Authorization");
+ res.setHeader("Access-Control-Allow-Credentials","true");
 res.setHeader("Access-Control-Allow-Methods","GET,POST,PATCH,DELETE,OPTIONS");
 res.setHeader("X-Content-Type-Options","nosniff");
 res.setHeader("X-Frame-Options","DENY");
@@ -170,6 +171,7 @@ if(req.method==="DELETE"&&path.startsWith("customers/")){
   await auditDataChange(u,"customer_removed","customer",customerId,snapshot,null,{account_status:snapshot.account_status});
   return json(res,200,{ok:true,pending:false});
 }
+if(req.method==="POST"&&path==="auth/logout"){res.setHeader("Set-Cookie","nrora_ceo_token=; Domain=.nrroadcare.in; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax");return json(res,200,{ok:true})}
 if(req.method==="GET"&&path==="health")return json(res,200,{ok:true,service:"nrroadcare-api",time:new Date().toISOString()});
 if(req.method==="POST"&&path==="auth/login"){const{username,password}=req.body||{};const loginUsername=String(username||"").trim().replace(/^@+/,"").slice(0,80);if(!loginUsername||typeof password!=="string"||!password)return json(res,400,{error:"Username and password are required"});if(!(await checkLoginAllowed(loginUsername,req)))return json(res,429,{error:"Too many failed login attempts. Please wait 10 minutes and try again."});const r=await pool.query("select * from users where lower(username)=lower($1) and active=true",[loginUsername]);const u=r.rows[0];if(u&&verifyHash(u.password_hash,password)){if(!String(u.password_hash).startsWith("scrypt$"))await pool.query("update users set password_hash=$1 where id=$2",[hash(password),u.id]);await recordLoginSuccess(loginUsername,req,u.role);const sessionToken=token(u);setSessionCookie(res,sessionToken);return json(res,200,{token:sessionToken,user:{id:u.id,username:u.username,role:u.role,name:u.name,phone:u.phone}});}const m=await pool.query("select id,name,phone,username,password_hash,active from technicians where lower(username)=lower($1) and active=true",[loginUsername]);const mech=m.rows[0];if(mech&&mech.password_hash&&verifyHash(mech.password_hash,password)){if(!String(mech.password_hash).startsWith("scrypt$"))await pool.query("update technicians set password_hash=$1 where id=$2",[hash(password),mech.id]);await recordLoginSuccess(loginUsername,req,"mechanic");const sessionToken=token({id:mech.id,username:mech.username,role:"mechanic",name:mech.name,phone:mech.phone});setSessionCookie(res,sessionToken);return json(res,200,{token:sessionToken,user:{id:mech.id,username:mech.username,role:"mechanic",name:mech.name,phone:mech.phone}});}await recordLoginFailure(loginUsername,req);return json(res,401,{error:"Invalid username or password"})}
 if(req.method==="GET"&&path==="auth/me"){const u=requireAuth(req,res);if(!u)return;return json(res,200,{user:u})}

@@ -88,6 +88,10 @@
     {
       "source": "/api/employees",
       "destination": "/api/mechanics?route=employees"
+    },
+    {
+      "source": "/api/payments",
+      "destination": "/api/mechanics?route=payments"
     }
   ]
 }

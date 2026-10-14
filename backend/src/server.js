@@ -8,7 +8,22 @@ dotenv.config();
 const { Pool } = pg;
 const app = express();
 const port = Number(process.env.PORT || 4000);
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+function normalizeDatabaseUrl(value) {
+  if (!value) return value;
+  try {
+    const url = new URL(value);
+    const mode = url.searchParams.get("sslmode");
+    // These modes currently have the same effective behavior as verify-full in pg-connection-string.
+    if (["prefer", "require", "verify-ca"].includes(String(mode || "").toLowerCase())) {
+      url.searchParams.set("sslmode", "verify-full");
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
+const pool = new Pool({ connectionString: normalizeDatabaseUrl(process.env.DATABASE_URL) });
 const SESSION_SECRET = process.env.SESSION_SECRET || "change-this-session-secret-in-vercel";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "NRORA@123";

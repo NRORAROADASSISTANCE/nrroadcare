@@ -1,7 +1,7 @@
 import React,{useEffect,useState} from "react";
 import CustomerDetailsOverlay from "./CustomerDetailsOverlayFixed.jsx";
 
-const API="https://www.nrroadcare.in/api";
+const API="/api";
 const getToken=()=>sessionStorage.getItem("nrora_ceo_token")||localStorage.getItem("nrora_ceo_token")||sessionStorage.getItem("nrora_token")||localStorage.getItem("nrora_token")||"";
 const api=async(path,options={})=>{const headers={"Content-Type":"application/json",...(options.headers||{})};const t=getToken();if(t)headers.Authorization=`Bearer ${t}`;const [p,q]=path.split("?");const r=await fetch(API+"/mechanics?route="+encodeURIComponent(p.replace(/^\//,""))+(q?"&"+q:""),{...options,headers});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.error||`Request failed (${r.status})`);return d};
 const roles=["admin","general_manager","division_manager","area_manager","tl","staff","telecaller","mechanic"];

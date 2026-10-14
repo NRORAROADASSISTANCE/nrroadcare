@@ -7,13 +7,13 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: resolve(__dirname, "index.html"),
-        register: resolve(__dirname, "register.html"),
-        customerRegister: resolve(__dirname, "customer-register.html"),
-        customerLogin: resolve(__dirname, "customer-login.html"),
-        requests: resolve(__dirname, "requests.html"),
-        contact: resolve(__dirname, "contact.html"),
-        ceo: resolve(__dirname, "ceo.html")
+        main: resolve(import.meta.dirname, "index.html"),
+        register: resolve(import.meta.dirname, "register.html"),
+        customerRegister: resolve(import.meta.dirname, "customer-register.html"),
+        customerLogin: resolve(import.meta.dirname, "customer-login.html"),
+        requests: resolve(import.meta.dirname, "requests.html"),
+        contact: resolve(import.meta.dirname, "contact.html"),
+        ceo: resolve(import.meta.dirname, "ceo.html")
       }
     }
   }
